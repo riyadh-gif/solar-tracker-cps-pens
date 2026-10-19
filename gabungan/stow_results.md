@@ -1,0 +1,38 @@
+# Strategi parkir (stow) dan acuan posisi rumah
+
+Skrip: `stow_sim.py` (`--check` self-check, tanpa argumen menjalankan 1.500 simulasi sekitar 2.8 menit dengan 14 proses, `--rate` sensitivitas laju kemiringan sekitar 45 detik). Tabel lengkap: `stow_results_tables.md`, data mentah: `stow_runs.csv` (3000 baris, dua baris per simulasi: tanpa dan dengan acuan). Memakai `coupled_sim.py`, `hybrid_sim.py` (kait `ov` penimpa perintah), dan `dyn_model.py`.
+
+## Pertanyaan dan model
+
+Dengan stepper loop terbuka, satu kejadian momen angin melewati torsi tahan menghilangkan sumbu (ratusan siklus, lihat `coupled_results.md`). Apakah parkir saat angin kencang dan acuan posisi rumah (saklar batas) mencegahnya, dan berapa harganya dalam energi?
+
+Skenario: langit cerah 2026-10-04, astronomi saja (sensor tidak memengaruhi energi), lima tingkat angin (rata-rata 3, 5, 7, 9, 11 m/s, turbulensi 30%, hembusan 3 per jam sebesar 0.8 sampai 1.5 kali rata-rata), ambang parkir 8, 10, 12, 15 m/s atau tanpa parkir, 20 seed per sel.
+- **Parkir:** azimuth ditahan, kemiringan menuju 0. Angin diukur sebagai rata-rata 4 detik. Lepas parkir setelah angin di bawah 0.7 kali ambang selama 10 menit.
+- **Manfaat panel datar (`k_flat`):** momen angin turun menjadi k_flat kali bila panel datar, linear terhadap |q2|/45 deg. Nilai 1.0 (tanpa manfaat), 0.5, 0.2 adalah ASUMSI, belum diukur.
+- **Kehilangan sumbu:** setiap kejadian melewati torsi tahan membuat panel tidak berguna (energi nol, batas bawah konservatif) sampai pulih. Tanpa acuan: sampai akhir hari. Dengan acuan: sampai angin (rata-rata 4 detik) di bawah ambang pulih tetap V_rec selama 10 menit, ditambah 5 menit penyetelan ulang. V_rec = 8, 10, atau 12 m/s, SAMA untuk semua strategi (disapu), tidak lagi terkait ambang parkir.
+
+## Temuan
+
+1. **Parkir hanya menolong bila meratakan panel memang menurunkan momen angin.** Pada k_flat = 1.0 jumlah kejadian tidak berubah (rata-rata 7 m/s: 5.85 per hari tanpa parkir, 5.6 dengan parkir) dan energi justru turun. Ini asumsi aerodinamika paling menentukan dan belum diukur.
+2. **Ambang yang masuk akal sekitar 10 sampai 12 m/s (rata-rata 4 detik).** Pada rata-rata 7 m/s dan k_flat 0.5 atau 0.2: kejadian turun dari sekitar 3.7 sampai 4.2 per hari (tanpa parkir) menjadi 0.1 per hari (ambang 10 atau 12), dengan konsekuensi panel terparkir hampir seharian (energi sekitar 75 sampai 84%, lebih baik daripada 17 sampai 28% tanpa parkir). Pada ambang 8 m/s kejadiannya nol tetapi panel terparkir 99.9% waktu (energi 83.8%).
+3. **Ambang 15 m/s terlalu terlambat:** masih 2.7 sampai 3.05 kejadian per hari pada rata-rata 7 m/s. Penyebabnya BUKAN kecepatan meratakan panel: laju kemiringan 1, 3, dan 10 deg/s memberi hasil identik (3.05 kejadian per hari pada rata-rata 7 m/s untuk ketiganya, 2.40 turun ke 2.25 pada rata-rata 9 m/s). Penyebab dominan adalah keterlambatan sensor: angin dirata-rata 4 detik sedangkan hembusan hanya 3 sampai 8 detik, jadi ambang baru terlewati setelah hembusan hampir lewat. Parkir harus bersifat antisipatif (ambang pada angin rata-rata, jauh di bawah kecepatan lepas sinkron sekitar 17.8 m/s), bukan reaktif terhadap hembusan. (Penjelasan awal saya soal laju kemiringan salah, dibantah uji ini.)
+4. **Ambang terlalu rendah membuang energi tanpa mencegah apa pun:** pada rata-rata 5 m/s (puncak sekitar 14.7 m/s, tidak ada kejadian tanpa parkir) parkir di 8 m/s membuat panel terparkir 98.8% waktu (energi 83.8%), di 10 m/s 70.7% (88.3%), di 12 m/s hanya 2.2% (99.7%), di 15 m/s tidak sama sekali. Pada rata-rata 3 m/s tidak ada pengaruh apa pun.
+5. **Parkir tidak menyelamatkan dari angin ekstrem.** Pada k_flat 0.5 dan rata-rata 11 m/s (puncak sekitar 32 m/s) masih ada sekitar 17 kejadian per hari walau terparkir (lepas sinkron saat datar pada sekitar 25 m/s menurut model). Itu butuh margin torsi (misalnya reduksi roda gigi) atau driver loop tertutup.
+6. **Manfaat acuan rumah bergantung besar pada ambang pulih V_rec dan pada apakah angin kencang bertahan.** Rata-rata 7 m/s, tanpa parkir, k_flat 1.0: waktu hilang 9 jam tanpa acuan, 7.3 jam dengan acuan pada V_rec 10 m/s, dan hanya 1.9 jam pada V_rec 12 m/s (energi 17% menjadi 33% lalu 84% dari ideal). Pada rata-rata 9 dan 11 m/s angin kencang bertahan hampir seharian, jadi panel tidak berguna apa pun strateginya (waktu hilang 11 jam, energi kurang dari 1%).
+7. **Bila energi satu-satunya ukuran, "tanpa parkir, tapi menyetel ulang cepat" menang pada angin sedang, tetapi ukuran itu menyesatkan.** Rata-rata 7 m/s, k_flat 0.5: tanpa parkir dengan acuan V_rec 12 m/s memberi energi 89.8% walau ada 4.2 kejadian kehilangan sumbu per hari, lebih tinggi daripada parkir di 10 atau 12 m/s (83.7 sampai 83.8%, 0.1 kejadian per hari), karena panel terparkir 98 sampai 99.6% waktu dan itu mahal. Namun satu kejadian berarti beban berputar ratusan siklus (kerusakan mekanis, kabel terpelintir, benturan rangka) yang TIDAK dimodelkan dan tidak tercermin di energi. Karena itu kejadian harus diperlakukan sebagai kegagalan, bukan biaya energi, dan kebijakan yang direkomendasikan tetap parkir antisipatif.
+8. **Sebagian biaya energi parkir adalah artefak aturan lepas parkir.** Lepas parkir mensyaratkan angin di bawah 0.7 kali ambang selama 10 menit. Pada rata-rata 7 m/s dan ambang 10 m/s itu setara 7 m/s, sehingga panel hampir tidak pernah lepas parkir (stow_frac 0.996). Aturan lepas parkir yang lebih longgar belum diuji, jadi biaya energi parkir pada angin sedang di sini adalah batas atas.
+
+## Keterbatasan dan pembatas penting
+
+- `k_flat`, laju angin, turbulensi, jumlah hembusan, Cn, lengan momen (0.066 dan 0.10 m), dan arah angin sama untuk dua sumbu adalah asumsi. Frekuensi kejadian bergantung kuadrat pada kecepatan angin.
+- **Syarat pulih sudah diperbaiki** (V_rec tetap untuk semua strategi, disapu 8, 10, 12 m/s), sehingga perbandingan acuan antar ambang parkir kini adil. Syarat LEPAS PARKIR tetap 0.7 kali ambang selama 10 menit dan belum disapu (lihat temuan 8). Pada V_rec 8 m/s baris "dengan acuan" praktis sama dengan "tanpa acuan" pada angin rata-rata di atas sekitar 7 m/s, karena angin hampir tidak pernah turun di bawah 8 m/s selama 10 menit.
+- Dampak kehilangan sumbu tidak disimulasikan fisik (hanya energi nol sampai pulih), jadi lama dan pemulihan nyata bisa berbeda. Satu hari, langit cerah, astronomi saja. Hanya 20 seed per sel dan tanpa interval kepercayaan; sel dengan p_event pecahan (0.05 sampai 0.35) paling tidak stabil.
+- Waktu sampel 2 detik dan resolusi angin 0.25 detik; momen dalam satu langkah 2 detik dirata-rata untuk defleksi, tetapi pelampauan torsi tahan dideteksi per 0.25 detik.
+
+## Implikasi desain (turunan, bergantung asumsi)
+
+- Pasang anemometer dan parkir **antisipatif pada angin rata-rata sekitar 10 sampai 12 m/s**, bukan menunggu hembusan 15 m/s.
+- **Ukur manfaat panel datar** (momen angin saat datar dibanding miring), karena menentukan apakah parkir berguna sama sekali.
+- Wajib ada **saklar posisi rumah**, tetapi ia tidak menyelamatkan hari dengan angin kencang berkepanjangan, dan manfaatnya sangat bergantung pada seberapa cepat penyetelan ulang diizinkan (V_rec 12 m/s memangkas waktu hilang dari 9 jam menjadi 1.9 jam pada angin sedang). Menyetel ulang pada angin sedang itu sendiri berisiko, dan risiko itu belum dimodelkan.
+- Jangan memilih kebijakan hanya dari energi: kejadian kehilangan sumbu adalah kegagalan mekanis. Jalur yang lebih aman adalah menaikkan margin torsi sehingga angin lepas sinkron jauh di atas hembusan yang wajar, bukan mengandalkan penyetelan ulang cepat.
+- Untuk angin di atas sekitar 25 m/s perlu **margin torsi** (reduksi roda gigi atau driver loop tertutup), karena parkir saja tidak cukup.

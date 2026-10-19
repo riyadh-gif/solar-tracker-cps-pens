@@ -1,0 +1,4 @@
+Kita harus menghitung Osilasi dari pergerakan 2 arah motor, ini penting. kita harus menghitung dia bisa kembali ke titik stabilannya, jika dia bergerak dari suatu degree ke degree lainnya di solar panel
+
+
+ada beberapa parameter yang diketahui 

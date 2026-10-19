@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<robot name="solar_tracker">
+  <material name="alu"><color rgba="0.75 0.77 0.8 1"/></material>
+  <material name="panel"><color rgba="0.1 0.2 0.5 0.8"/></material>
+  <material name="ldr"><color rgba="0.9 0.1 0.1 1"/></material>
+  <link name="world"/>
+  <joint name="world_joint" type="fixed"><parent link="world"/><child link="base_link"/></joint>
+  <link name="base_link"><visual><geometry><mesh filename="file:///home/riyadh/mk/solar_tracker/meshes/base.stl"/></geometry><material name="alu"/></visual>
+    <inertial><origin xyz="-0.00067 0.00000 0.06873"/><mass value="2.1340"/><inertia ixx="0.018119" iyy="0.013247" izz="0.019597" ixy="6.4596e-19" ixz="-8.3662e-05" iyz="3.8538e-19"/></inertial></link>
+  <link name="azimuth_link"><visual><geometry><mesh filename="file:///home/riyadh/mk/solar_tracker/meshes/azimuth_link.stl"/></geometry><material name="alu"/></visual>
+    <inertial><origin xyz="0.02951 0.00163 0.03639"/><mass value="1.4390"/><inertia ixx="0.0007869" iyy="0.0015058" izz="0.0014388" ixy="-4.2655e-05" ixz="-0.00012549" iyz="-9.0677e-06"/></inertial></link>
+  <link name="elevation_link"><visual><geometry><mesh filename="file:///home/riyadh/mk/solar_tracker/meshes/elevation_link.stl"/></geometry><material name="alu"/></visual>
+    <inertial><origin xyz="-0.01495 0.00832 0.02563"/><mass value="0.5050"/><inertia ixx="0.0038818" iyy="0.0071636" izz="0.010893" ixy="-0.00016635" ixz="-0.00014715" iyz="-9.0017e-05"/></inertial></link>
+  <link name="panel"><visual><origin xyz="-0.0006 0.0092 0.0547"/><geometry><box size="0.67 0.445 0.025"/></geometry><material name="panel"/></visual>
+    <inertial><origin xyz="-0.00057 0.00918 0.05475"/><mass value="2.5500"/><inertia ixx="0.042213" iyy="0.095524" izz="0.13747" ixy="0" ixz="0" iyz="0"/></inertial></link>
+  <joint name="azimuth_joint" type="continuous"><parent link="base_link"/><child link="azimuth_link"/>
+    <origin xyz="0.0 0.0 0.165"/><axis xyz="0 0 -1"/><dynamics damping="0.2" friction="0.05"/></joint>
+  <joint name="elevation_joint" type="revolute"><parent link="azimuth_link"/><child link="elevation_link"/>
+    <origin xyz="0.0 0.0 0.0395"/><axis xyz="1 0 0"/><dynamics damping="0.2" friction="0.05"/>
+    <limit lower="-0.7854" upper="0.7854" effort="3" velocity="1"/></joint>
+  <joint name="panel_joint" type="fixed"><parent link="elevation_link"/><child link="panel"/></joint>
+  <link name="ldr_x_pos"><visual><geometry><cylinder radius="0.006" length="0.004"/></geometry><material name="ldr"/></visual></link>
+  <joint name="ldr_x_pos_joint" type="fixed"><parent link="elevation_link"/><child link="ldr_x_pos"/><origin xyz="0.3344 0.0092 0.0672"/></joint>
+  <link name="ldr_x_neg"><visual><geometry><cylinder radius="0.006" length="0.004"/></geometry><material name="ldr"/></visual></link>
+  <joint name="ldr_x_neg_joint" type="fixed"><parent link="elevation_link"/><child link="ldr_x_neg"/><origin xyz="-0.3356 0.0092 0.0672"/></joint>
+  <link name="ldr_y_pos"><visual><geometry><cylinder radius="0.006" length="0.004"/></geometry><material name="ldr"/></visual></link>
+  <joint name="ldr_y_pos_joint" type="fixed"><parent link="elevation_link"/><child link="ldr_y_pos"/><origin xyz="-0.0006 0.2317 0.0672"/></joint>
+  <link name="ldr_y_neg"><visual><geometry><cylinder radius="0.006" length="0.004"/></geometry><material name="ldr"/></visual></link>
+  <joint name="ldr_y_neg_joint" type="fixed"><parent link="elevation_link"/><child link="ldr_y_neg"/><origin xyz="-0.0006 -0.2133 0.0672"/></joint>
+  <gazebo>
+    <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher"/>
+    <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
+      <joint_name>azimuth_joint</joint_name><p_gain>137.14</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>3.0</cmd_max><cmd_min>-3.0</cmd_min>
+    </plugin>
+    <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
+      <joint_name>elevation_joint</joint_name><p_gain>101.82</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>3.0</cmd_max><cmd_min>-3.0</cmd_min>
+    </plugin>
+  </gazebo>
+</robot>

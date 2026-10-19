@@ -1,0 +1,521 @@
+{
+ "link": {
+  "base": {
+   "massa_kg": 2.134,
+   "com_m": [
+    -0.00066834,
+    4.7617e-18,
+    0.068729
+   ],
+   "inersia_com_kgm2": {
+    "ixx": 0.018119,
+    "iyy": 0.013247,
+    "izz": 0.019597,
+    "ixy": 6.4596e-19,
+    "ixz": -8.3662e-05,
+    "iyz": 3.8538e-19
+   },
+   "inersia_origin_link_kgm2": {
+    "ixx": 0.028201,
+    "iyy": 0.02333,
+    "izz": 0.019598,
+    "ixy": 6.5275e-19,
+    "ixz": 1.4376e-05,
+    "iyz": -3.1311e-19
+   },
+   "sumbu_sendi": "z",
+   "J_sumbu_sendi_kgm2": 0.0196,
+   "sumber": "campuran: profil dan poros dari mesh, sisanya asumsi"
+  },
+  "azimuth_link": {
+   "massa_kg": 1.439,
+   "com_m": [
+    0.029508,
+    0.0016303,
+    0.036395
+   ],
+   "inersia_com_kgm2": {
+    "ixx": 0.0007869,
+    "iyy": 0.0015058,
+    "izz": 0.0014388,
+    "ixy": -4.2655e-05,
+    "ixz": -0.00012549,
+    "iyz": -9.0677e-06
+   },
+   "inersia_origin_link_kgm2": {
+    "ixx": 0.0026968,
+    "iyy": 0.0046648,
+    "izz": 0.0026955,
+    "ixy": -0.00011188,
+    "ixz": -0.0016709,
+    "iyz": -9.4451e-05
+   },
+   "sumbu_sendi": "z",
+   "J_sumbu_sendi_kgm2": 0.002696,
+   "sumber": "campuran: profil dan poros dari mesh, sisanya asumsi"
+  },
+  "elevation_link": {
+   "massa_kg": 0.505,
+   "com_m": [
+    -0.014952,
+    0.0083166,
+    0.025627
+   ],
+   "inersia_com_kgm2": {
+    "ixx": 0.0038818,
+    "iyy": 0.0071636,
+    "izz": 0.010893,
+    "ixy": -0.00016635,
+    "ixz": -0.00014715,
+    "iyz": -9.0017e-05
+   },
+   "inersia_origin_link_kgm2": {
+    "ixx": 0.0042484,
+    "iyy": 0.0076081,
+    "izz": 0.011041,
+    "ixy": -0.00010356,
+    "ixz": 4.6338e-05,
+    "iyz": -0.00019764
+   },
+   "sumbu_sendi": "x",
+   "J_sumbu_sendi_kgm2": 0.004248,
+   "sumber": "campuran: profil dan poros dari mesh, sisanya asumsi"
+  },
+  "panel": {
+   "massa_kg": 2.55,
+   "com_m": [
+    -0.00056963,
+    0.0091835,
+    0.054749
+   ],
+   "inersia_com_kgm2": {
+    "ixx": 0.042213,
+    "iyy": 0.095524,
+    "izz": 0.13747,
+    "ixy": 0.0,
+    "ixz": 0.0,
+    "iyz": 0.0
+   },
+   "inersia_origin_link_kgm2": {
+    "ixx": 0.050072,
+    "iyy": 0.10317,
+    "izz": 0.13769,
+    "ixy": 1.334e-05,
+    "ixz": 7.9525e-05,
+    "iyz": -0.0012821
+   },
+   "sumbu_sendi": "x",
+   "J_sumbu_sendi_kgm2": 0.05007,
+   "sumber": "asumsi (panel 1.5 kg, kotak seragam)"
+  }
+ },
+ "bagian": {
+  "00": {
+   "link": "base",
+   "massa_kg": 0.07129,
+   "volume_cm3": 26.4,
+   "com_m": [
+    0.07,
+    -0.17,
+    0.01
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "profil 2020 aluminium 2700, volume mesh watertight"
+  },
+  "01": {
+   "link": "base",
+   "massa_kg": 0.07129,
+   "volume_cm3": 26.4,
+   "com_m": [
+    -0.08,
+    -0.17,
+    0.01
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "profil 2020 aluminium 2700, volume mesh watertight"
+  },
+  "02": {
+   "link": "base",
+   "massa_kg": 0.191,
+   "volume_cm3": 70.73,
+   "com_m": [
+    -7.9836e-18,
+    -0.085,
+    0.01
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "profil 2020 aluminium 2700, volume mesh watertight"
+  },
+  "03": {
+   "link": "base",
+   "massa_kg": 0.07129,
+   "volume_cm3": 26.4,
+   "com_m": [
+    0.044,
+    -2.6733e-18,
+    0.01
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "profil 2020 aluminium 2700, volume mesh watertight"
+  },
+  "04": {
+   "link": "base",
+   "massa_kg": 0.07129,
+   "volume_cm3": 26.4,
+   "com_m": [
+    -0.044,
+    -2.6733e-18,
+    0.01
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "profil 2020 aluminium 2700, volume mesh watertight"
+  },
+  "05": {
+   "link": "base",
+   "massa_kg": 0.191,
+   "volume_cm3": 70.73,
+   "com_m": [
+    0.0,
+    0.085,
+    0.01
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "profil 2020 aluminium 2700, volume mesh watertight"
+  },
+  "06": {
+   "link": "base",
+   "massa_kg": 0.07129,
+   "volume_cm3": 26.4,
+   "com_m": [
+    0.07,
+    0.17,
+    0.01
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "profil 2020 aluminium 2700, volume mesh watertight"
+  },
+  "07": {
+   "link": "base",
+   "massa_kg": 0.07129,
+   "volume_cm3": 26.4,
+   "com_m": [
+    -0.08,
+    0.17,
+    0.01
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "profil 2020 aluminium 2700, volume mesh watertight"
+  },
+  "20": {
+   "link": "elevation_link",
+   "massa_kg": 0.2073,
+   "volume_cm3": 76.77,
+   "com_m": [
+    0.0042861,
+    -0.080643,
+    0.028459
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "profil 2020 aluminium 2700, volume mesh watertight"
+  },
+  "21": {
+   "link": "elevation_link",
+   "massa_kg": 0.2073,
+   "volume_cm3": 76.76,
+   "com_m": [
+    -0.0054249,
+    0.099056,
+    0.032233
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "profil 2020 aluminium 2700, volume mesh watertight"
+  },
+  "08": {
+   "link": "base",
+   "massa_kg": 0.06231,
+   "volume_cm3": 153.9,
+   "com_m": [
+    0.024,
+    1.6631e-18,
+    0.036158
+   ],
+   "metode": "hull",
+   "fill": 0.15,
+   "sumber": "asumsi",
+   "catatan": "mesh tidak watertight; tiang = profil 2020 miring, diagonal ~130 mm x 176 mm2 = ~15% volume hull, Al 2700"
+  },
+  "09": {
+   "link": "base",
+   "massa_kg": 0.06231,
+   "volume_cm3": 153.9,
+   "com_m": [
+    -0.024,
+    -5.7349e-20,
+    0.036158
+   ],
+   "metode": "hull",
+   "fill": 0.15,
+   "sumber": "asumsi",
+   "catatan": "sama dengan bagian 08"
+  },
+  "10": {
+   "link": "base",
+   "massa_kg": 1.2,
+   "volume_cm3": 245.2,
+   "com_m": [
+    -6.5384e-07,
+    -2.8789e-19,
+    0.11174
+   ],
+   "metode": "motor",
+   "fill": null,
+   "sumber": "asumsi",
+   "catatan": "motor 57HSE3.0N (NEMA23) 1.2 kg asumsi, seragam di volume hull"
+  },
+  "11": {
+   "link": "azimuth_link",
+   "massa_kg": 0.002544,
+   "volume_cm3": 0.324,
+   "com_m": [
+    0.0026905,
+    -0.010863,
+    -0.005
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "asumsi",
+   "catatan": "komponen kecil (0.3 cm3), diasumsikan baja 7850 (pengencang), ~2.5 g"
+  },
+  "12": {
+   "link": "azimuth_link",
+   "massa_kg": 0.01445,
+   "volume_cm3": 5.353,
+   "com_m": [
+    8.9898e-05,
+    -0.0015716,
+    -0.004999
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "asumsi",
+   "catatan": "pelat/braket 5.4 cm3 solid, diasumsikan Al 2700"
+  },
+  "13": {
+   "link": "azimuth_link",
+   "massa_kg": 0.222,
+   "volume_cm3": 274.0,
+   "com_m": [
+    -0.00079982,
+    -1.5519e-05,
+    0.023024
+   ],
+   "metode": "hull",
+   "fill": 0.3,
+   "sumber": "asumsi",
+   "catatan": "mesh tidak watertight; rumah pillow block, isi 30% hull, Al 2700 (jika besi cor massa ~2.6x lebih besar)"
+  },
+  "14": {
+   "link": "elevation_link",
+   "massa_kg": 0.001835,
+   "volume_cm3": 0.2338,
+   "com_m": [
+    -0.091761,
+    -0.079629,
+    -0.0096979
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "asumsi",
+   "catatan": "komponen kecil (0.23 cm3), diasumsikan baja 7850 (kolar/baut), ~1.8 g"
+  },
+  "15": {
+   "link": "elevation_link",
+   "massa_kg": 0.001835,
+   "volume_cm3": 0.2337,
+   "com_m": [
+    -0.10147,
+    0.10007,
+    -0.0059242
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "asumsi",
+   "catatan": "sama dengan bagian 14"
+  },
+  "16": {
+   "link": "elevation_link",
+   "massa_kg": 0.02397,
+   "volume_cm3": 8.879,
+   "com_m": [
+    -0.095851,
+    -0.080164,
+    0.0053308
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "asumsi",
+   "catatan": "dudukan poros SK8, volume mesh solid x Al 2700 (rongga baut tidak dimodelkan)"
+  },
+  "17": {
+   "link": "elevation_link",
+   "massa_kg": 0.02397,
+   "volume_cm3": 8.879,
+   "com_m": [
+    -0.10556,
+    0.099534,
+    0.0091046
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "asumsi",
+   "catatan": "sama dengan bagian 16"
+  },
+  "18": {
+   "link": "azimuth_link",
+   "massa_kg": 1.2,
+   "volume_cm3": 245.2,
+   "com_m": [
+    0.035525,
+    0.0019998,
+    0.039455
+   ],
+   "metode": "motor",
+   "fill": null,
+   "sumber": "asumsi",
+   "catatan": "motor 57HSE3.0N (NEMA23) 1.2 kg asumsi, seragam di volume hull"
+  },
+  "19": {
+   "link": "elevation_link",
+   "massa_kg": 0.03881,
+   "volume_cm3": 4.944,
+   "com_m": [
+    -0.054904,
+    -0.0030391,
+    0.0011325
+   ],
+   "metode": "solid",
+   "fill": null,
+   "sumber": "mesh",
+   "catatan": "poros baja 8 mm, volume mesh x 7850"
+  }
+ },
+ "dinamika": {
+  "J_az_q0_kgm2": 0.1514,
+  "J_az_q45_kgm2": 0.131,
+  "J_el_kgm2": 0.05432,
+  "com_elevasi_plus_panel_m": [
+   -0.0029469,
+   0.0090402,
+   0.049935
+  ],
+  "lengan_y_mm": 9.04,
+  "lengan_z_mm": 49.93,
+  "lengan_xz_mm": 50.75,
+  "Mg_max_dalam_batas_45deg_Nm": 1.274,
+  "Mg_pada_q0_Nm": 0.2762,
+  "Mg_batas_atas_Nm": 1.55,
+  "massa_elevasi_plus_panel_kg": 3.055,
+  "massa_total_berputar_kg": 4.494,
+  "sumber": "asumsi dominan (motor 1.2 kg, panel 1.5 kg, fill hull)"
+ },
+ "puntir_poros8": {
+  "G_Pa": 79000000000.0,
+  "d_m": 0.008,
+  "L_m": 0.1003,
+  "J_polar_m4": 4.021e-10,
+  "kt_Nm_per_rad": 316.7,
+  "catatan": "angka referensi dari geometri poros, BUKAN kekakuan sendi sebenarnya"
+ },
+ "sensitivitas": {
+  "motor1.2_panel1.0": {
+   "motor_kg": 1.2,
+   "panel_kg": 1.0,
+   "J_az_q0": 0.06773,
+   "J_az_q45": 0.05855,
+   "J_el": 0.02388,
+   "lengan_xz_mm": 45.85,
+   "Mg_max_Nm": 0.5733,
+   "M_rot_kg": 2.944
+  },
+  "motor1.2_panel1.5": {
+   "motor_kg": 1.2,
+   "panel_kg": 1.5,
+   "J_az_q0": 0.09473,
+   "J_az_q45": 0.08191,
+   "J_el": 0.0337,
+   "lengan_xz_mm": 48.25,
+   "Mg_max_Nm": 0.7993,
+   "M_rot_kg": 3.444
+  },
+  "motor1.2_panel3.0": {
+   "motor_kg": 1.2,
+   "panel_kg": 3.0,
+   "J_az_q0": 0.1757,
+   "J_az_q45": 0.152,
+   "J_el": 0.06316,
+   "lengan_xz_mm": 51.36,
+   "Mg_max_Nm": 1.477,
+   "M_rot_kg": 4.944
+  },
+  "motor0.9_panel1.5": {
+   "motor_kg": 0.9,
+   "panel_kg": 1.5,
+   "J_az_q0": 0.09411,
+   "J_az_q45": 0.08129,
+   "J_el": 0.0337,
+   "lengan_xz_mm": 48.25,
+   "Mg_max_Nm": 0.7993,
+   "M_rot_kg": 3.144
+  },
+  "motor1.6_panel1.5": {
+   "motor_kg": 1.6,
+   "panel_kg": 1.5,
+   "J_az_q0": 0.09555,
+   "J_az_q45": 0.08273,
+   "J_el": 0.0337,
+   "lengan_xz_mm": 48.25,
+   "Mg_max_Nm": 0.7993,
+   "M_rot_kg": 3.844
+  },
+  "motor0.9_panel1.0": {
+   "motor_kg": 0.9,
+   "panel_kg": 1.0,
+   "J_az_q0": 0.06712,
+   "J_az_q45": 0.05793,
+   "J_el": 0.02388,
+   "lengan_xz_mm": 45.85,
+   "Mg_max_Nm": 0.5733,
+   "M_rot_kg": 2.644
+  },
+  "motor1.6_panel3.0": {
+   "motor_kg": 1.6,
+   "panel_kg": 3.0,
+   "J_az_q0": 0.1765,
+   "J_az_q45": 0.1528,
+   "J_el": 0.06316,
+   "lengan_xz_mm": 51.36,
+   "Mg_max_Nm": 1.477,
+   "M_rot_kg": 5.344
+  }
+ }
+}

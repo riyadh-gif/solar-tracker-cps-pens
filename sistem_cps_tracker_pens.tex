@@ -1,0 +1,1027 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{fancyvrb}
+\usepackage[hidelinks]{hyperref}
+
+\renewcommand{\tablename}{Tabel}
+\renewcommand{\contentsname}{Daftar Isi}
+\renewcommand{\refname}{Rujukan Model}
+\setlength{\parskip}{0.45em}
+\setlength{\parindent}{0pt}
+
+\newcommand{\nhat}{\hat{\bm{n}}}
+\newcommand{\shat}{\hat{\bm{s}}}
+\newcommand{\what}{\hat{\bm{w}}}
+\newcommand{\xp}{\hat{\bm{x}}_p}
+\newcommand{\yp}{\hat{\bm{y}}_p}
+\newcommand{\degg}{^\circ}
+\newcommand{\model}[1]{\textbf{\textit{Model: #1}}}
+
+\title{\textbf{Solar Tracker Dua Sumbu PENS\\ sebagai Cyber-Physical System}\\[0.4em]
+\large Model Matematis, Validasi Numerik, dan Jalan Menuju Digital Twin}
+\author{Program Magister Terapan, Politeknik Elektronika Negeri Surabaya\\
+Titik pemasangan: $-7{,}276006\degg$ LS, $112{,}794327\degg$ BT}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Dokumen ini memodelkan solar tracker dua sumbu (azimuth dan kemiringan) sebagai Cyber-Physical System,
+mengikuti kerangka \emph{Solar Tracking Systems and Cyber-Physical Systems}, tetapi dengan seluruh besaran
+berasal dari CAD alat, pelat nama komponen, data cuaca terukur, atau simulasi multi-benda yang tervalidasi.
+Setiap persamaan diberi nama modelnya dan setiap asumsi diberi tanda eksplisit.
+
+Perbedaan paling menentukan dengan kerangka rujukan: kerangka itu mengandaikan aktuator servo bertorsi
+dengan enkoder kuadratur, sedangkan alat ini memakai \textbf{motor stepper loop terbuka tanpa enkoder}.
+Akibatnya \emph{Computed Torque Control} dan \emph{Sliding Mode Control} tidak dapat diterapkan apa adanya;
+penggantinya adalah umpan maju astronomis, pembentuk perintah \emph{input shaper} ZVD, dan tapis Kalman
+diperluas yang berperan sebagai pengganti enkoder.
+
+Hasil utama yang terukur: frekuensi alami sumbu azimuth $4{,}79$~Hz (prediksi nilai eigen) berbanding
+$5{,}19$~Hz (Gazebo); lewatan langkah satu derajat $93{,}3\%$ (teori) berbanding $90\%$ (Gazebo); peredam
+ZVD menekan lewatan terburuk dari $19{,}35\degg$ menjadi $2{,}30\degg$; tapis Kalman dengan LDR terkalibrasi
+menurunkan galat pointing dari $2{,}52\degg$ menjadi $0{,}18\degg$; beban angin terburuk sebelas tahun hanya
+memakai $9{,}2\%$ torsi tahan motor.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%=====================================================================
+\section{Kerangka Koordinat dan Notasi}
+
+\model{Kerangka toposentrik lokal North-West-Up (NWU)}
+
+Kerangka rujukan memakai ENU; dokumen ini memakai NWU karena azimuth kompas kemudian muncul langsung
+sebagai rotasi negatif terhadap sumbu tegak, tanpa konversi tambahan:
+\begin{equation}
+\hat{\bm{x}} = \text{Utara}, \qquad \hat{\bm{y}} = \text{Barat}, \qquad \hat{\bm{z}} = \text{atas (zenith)}.
+\end{equation}
+
+Sumbu engsel kemiringan \textbf{searah rel panjang}, yaitu sumbu $x$ alat, sehingga panel berguling ke kanan
+dan kiri, bukan jungkat-jungkit sepanjang rel.
+
+\begin{longtable}{p{3.6cm} p{1.6cm} p{9.6cm}}
+\toprule
+\textbf{Besaran} & \textbf{Lambang} & \textbf{Definisi} \\
+\midrule
+\endhead
+Sudut sendi azimuth & $q_1$ & putar terhadap $\hat{\bm{z}}$, positif searah jarum jam dilihat dari atas, tanpa batas \\
+Sudut sendi kemiringan & $q_2$ & $0$ = panel datar; batas $\pm 45\degg$ (ASUMSI) \\
+Arah hadap rel & $\psi$ & $\psi = 90\degg$ (rel menghadap Utara, ASUMSI) \\
+Arah miring kompas & $q_1 + \psi$ & arah panel condong, diukur searah jarum jam dari Utara \\
+Azimuth matahari & $A$ & searah jarum jam dari Utara \\
+Elevasi matahari & $e$ & dari horizon; zenith $z = 90\degg - e$ \\
+\bottomrule
+\end{longtable}
+
+%=====================================================================
+\section{Posisi Matahari dan Irradiance}
+
+\subsection{Vektor arah matahari}
+
+\model{NREL Solar Position Algorithm (SPA), Reda dan Andreas}
+
+Kerangka rujukan memakai rumus deklinasi sederhana
+$\sin\alpha_s = \sin\phi\sin\delta + \cos\phi\cos\delta\cos\omega$. Sistem ini memakai SPA melalui pustaka
+\texttt{pvlib}, yang memperhitungkan nutasi, aberasi, dan refraksi atmosfer. Vektor satuan menuju matahari:
+\begin{equation}
+\shat = \begin{bmatrix} \cos e \cos A \\ -\cos e \sin A \\ \sin e \end{bmatrix}.
+\end{equation}
+
+\textbf{Tervalidasi:} selisih terhadap \texttt{astropy}, SolTrack, dan Pysolar \textbf{di bawah
+$0{,}011\degg$}.
+
+\subsection{Irradiance langit cerah dan tutupan awan}
+
+\model{Langit cerah Ineichen-Perez}; \model{Faktor awan Kasten-Czeplak}; \model{Dekomposisi Erbs}
+
+Irradiance horizontal global pada tutupan awan $N$ okta diperoleh dari nilai langit cerah:
+\begin{equation}
+G_h = G_{h,\mathrm{cs}} \left[ 1 - 0{,}75 \left( \frac{N}{8} \right)^{3{,}4} \right],
+\qquad N \in [0,8].
+\end{equation}
+Pemisahan komponen langsung (DNI, $I_b$) dan baur (DHI, $I_d$) memakai korelasi Erbs melalui indeks
+kecerahan $k_t = G_h / (I_{0}\cos z)$.
+
+\subsection{Irradiance pada bidang panel}
+
+\model{Transposisi isotropik Liu-Jordan}; \model{Koreksi sudut datang ASHRAE (Souka-Safwat)}
+
+Sudut datang $\theta_i$ memenuhi $\cos\theta_i = \shat \cdot \nhat$. Faktor IAM yang memodelkan pantulan kaca:
+\begin{equation}
+K_\tau(\theta_i) = 1 - b_0 \left( \frac{1}{\cos\theta_i} - 1 \right), \qquad b_0 = 0{,}05 \ \text{(ASUMSI)}.
+\end{equation}
+Irradiance total pada bidang panel (\emph{plane of array}, POA):
+\begin{equation}
+G_{\mathrm{POA}} = \underbrace{I_b \cos\theta_i\, K_\tau}_{\text{langsung}}
++ \underbrace{I_d \frac{1 + \cos\beta}{2}}_{\text{baur langit}}
++ \underbrace{G_h\, \rho_g \frac{1 - \cos\beta}{2}}_{\text{pantulan tanah}},
+\label{eq:poa}
+\end{equation}
+dengan $\beta$ kemiringan panel dari horizontal ($\cos\beta = n_z$) dan $\rho_g$ albedo tanah
+($0{,}25$ ASUMSI).
+
+\textbf{Catatan penting.} Dua suku terakhir Persamaan~\eqref{eq:poa} menarik titik optimum \emph{menjauh}
+dari arah matahari, dan ke arah yang \emph{berlawanan} satu sama lain. Konsekuensinya dibahas di
+Bagian~\ref{sec:arus}.
+
+%=====================================================================
+\section{Kinematika}
+
+\subsection{Vektor normal panel}
+
+\model{Kinematika rotasi benda tegar, rantai dua sendi putar}
+
+Normal panel diperoleh dengan memutar vektor zenith $\bm{n}_0 = [0,0,1]^T$ berturut-turut terhadap sumbu
+engsel kemiringan lalu sumbu azimuth:
+\begin{equation}
+\nhat = R_z(-q_1)\, R_x(q_2)\, \bm{n}_0
+= \begin{bmatrix}
+\sin q_2 \cos(q_1 + \psi) \\
+-\sin q_2 \sin(q_1 + \psi) \\
+\cos q_2
+\end{bmatrix}.
+\label{eq:fk}
+\end{equation}
+
+Basis panel yang menyertainya, dengan $a = q_1 + \psi$ dan $b = q_2$:
+\begin{equation}
+\xp = \begin{bmatrix} \cos b \cos a \\ -\cos b \sin a \\ -\sin b \end{bmatrix}
+\quad (\text{arah \emph{chord}, melintang engsel}), \qquad
+\yp = \begin{bmatrix} \sin a \\ \cos a \\ 0 \end{bmatrix}
+\quad (\text{arah \emph{span}, sejajar engsel}).
+\end{equation}
+
+\textbf{Tervalidasi:} normal panel dari TF Gazebo berbanding Persamaan~\eqref{eq:fk} pada
+$(q_1,q_2) = (0,30\degg)$, $(90\degg,30\degg)$, $(0,-30\degg)$ menunjukkan selisih $0{,}14$ sampai
+$0{,}34\degg$, seluruhnya terjelaskan oleh defleksi gravitasi.
+
+\subsection{Kinematika balik}
+
+Untuk matahari pada $(A, z)$ terdapat \emph{dua} solusi,
+\begin{equation}
+(q_1, q_2) = (A - \psi,\ z) \qquad \text{atau} \qquad (A - \psi + 180\degg,\ -z),
+\end{equation}
+dan dipilih cabang yang kontinu terhadap langkah sebelumnya, sehingga melewati zenith tidak menuntut putaran
+azimuth $180\degg$.
+
+\subsection{Jacobian dan singularitas \emph{keyhole}}
+
+\model{Jacobian analitik dan dekomposisi nilai singular}
+
+Turunan Persamaan~\eqref{eq:fk} terhadap sudut sendi:
+\begin{equation}
+\frac{\partial \nhat}{\partial q_1} = -\sin q_2\, \yp, \qquad
+\frac{\partial \nhat}{\partial q_2} = \xp,
+\end{equation}
+sehingga matriks Jacobian $\bm{J} = [\,\partial\nhat/\partial q_1 \ \ \partial\nhat/\partial q_2\,]
+\in \mathbb{R}^{3\times 2}$ memiliki nilai singular $\sigma_1 = 1$ dan $\sigma_2 = |\sin q_2|$, dengan
+bilangan kondisi
+\begin{equation}
+\kappa(\bm{J}) = \frac{1}{|\sin q_2|}.
+\end{equation}
+
+\begin{longtable}{c c c c c}
+\toprule
+$q_2$ & $1\degg$ & $5\degg$ & $30\degg$ & $45\degg$ \\
+\midrule
+$\kappa(\bm{J})$ & $57{,}3$ & $11{,}5$ & $2{,}0$ & $1{,}4$ \\
+\bottomrule
+\end{longtable}
+
+Inilah \textbf{efek keyhole}, dinyatakan sebagai hilangnya rank, bukan sebagai gejala terpisah. Dampaknya
+muncul kembali sebagai bobot sensor (Bagian~\ref{sec:fusi}) dan sebagai kovarians tapis
+(Bagian~\ref{sec:ekf}), tanpa memerlukan aturan ambang buatan.
+
+\subsection{Galat pointing dan rugi kosinus}
+
+\model{Hukum kosinus Lambert}
+\begin{equation}
+\theta_{\mathrm{err}} = \arccos\!\left( \nhat \cdot \shat \right), \qquad
+\text{rugi relatif komponen langsung} = 1 - \cos\theta_{\mathrm{err}}.
+\label{eq:cosloss}
+\end{equation}
+Untuk ayunan sinusoidal beramplitudo $A_0$, rugi rata-rata satu siklus mendekati $A_0^2/4$ pada sudut kecil.
+
+%=====================================================================
+\section{Dinamika Multi-Benda}
+
+\subsection{Persamaan gerak}
+
+\model{Persamaan Euler-Lagrange untuk manipulator dua derajat kebebasan}
+
+Dengan Lagrangian $\mathcal{L} = T - V$ dan koordinat umum $\bm{q} = [q_1, q_2]^T$, persamaan
+$\frac{d}{dt}\frac{\partial\mathcal{L}}{\partial\dot{q}_i} - \frac{\partial\mathcal{L}}{\partial q_i}
+= \tau_i$ menghasilkan bentuk baku manipulator:
+\begin{equation}
+\boxed{\;
+\bm{M}(\bm{q})\,\ddot{\bm{q}} + \bm{C}(\bm{q},\dot{\bm{q}})\,\dot{\bm{q}} + \bm{g}(\bm{q})
++ \bm{F}(\dot{\bm{q}}) + \bm{\tau}_w = \bm{\tau} \; }
+\label{eq:manip}
+\end{equation}
+
+\subsection{Matriks massa}
+
+\model{Teorema sumbu sejajar (Steiner) atas tensor inersia CAD}
+
+Inersia efektif sumbu azimuth bergantung kemiringan:
+\begin{equation}
+\bm{M}(\bm{q}) =
+\begin{bmatrix}
+J_1(q_2) & 0 \\ 0 & J_2
+\end{bmatrix},
+\qquad
+J_1(q_2) = I_{z1} + \left( m_2 r_c^2 + I_{y2} \right)\cos^2 q_2 + I_{z2}\sin^2 q_2 ,
+\qquad
+J_2 = m_2 r_c^2 + I_{x2}.
+\end{equation}
+Bentuk ini dapat ditulis ulang sebagai $J_1(q_2) = a + b\cos^2 q_2$. Dari tensor inersia CAD dengan panel
+$2{,}55$~kg:
+\begin{equation}
+J_1(q_2) = 0{,}1106 + 0{,}0408\cos^2 q_2 \ \mathrm{kg\,m^2}, \qquad
+J_2 = 0{,}0543 \ \mathrm{kg\,m^2}, \qquad
+\Delta I \equiv m_2 r_c^2 + I_{y2} - I_{z2} = 0{,}0408 \ \mathrm{kg\,m^2}.
+\end{equation}
+Nilai acuan: $J_1(0) = 0{,}1514$ dan $J_1(45\degg) = 0{,}1310 \ \mathrm{kg\,m^2}$.
+
+\subsection{Suku Coriolis dan sentripetal}
+
+\model{Simbol Christoffel jenis pertama}
+
+\begin{equation}
+\bm{C}(\bm{q},\dot{\bm{q}}) =
+\begin{bmatrix}
+-\Delta I \sin(2q_2)\,\dot{q}_2 & 0 \\[2pt]
+\tfrac{1}{2}\Delta I \sin(2q_2)\,\dot{q}_1 & 0
+\end{bmatrix},
+\end{equation}
+sehingga $\dot{\bm{M}} - 2\bm{C}$ bersifat anti-simetris dan sistem bersifat pasif.
+
+\textbf{Status: belum diterapkan dalam simulasi.} Besarnya sudah dihitung:
+
+\begin{longtable}{p{6.4cm} r r}
+\toprule
+\textbf{Keadaan} & \textbf{Coriolis azimuth} & \textbf{\% torsi tahan} \\
+\midrule
+Jejak harian khas ($\dot q_1 = 0{,}08\degg$/s) & $4{,}3\times10^{-8}$ N\,m & $0{,}0000\%$ \\
+Jejak laju maksimum & $5{,}4\times10^{-6}$ N\,m & $0{,}0002\%$ \\
+Slew $30\degg$/s & $9{,}7\times10^{-3}$ N\,m & $0{,}32\%$ \\
+\textbf{Slew $90\degg$/s} & $\bm{8{,}7\times10^{-2}}$ \textbf{N\,m} & $\bm{2{,}9\%}$ \\
+\bottomrule
+\end{longtable}
+
+Tidak berpengaruh saat menjejak, tetapi mencapai $3{,}4\%$ saat slew cepat pada $q_2 = 45\degg$.
+
+\subsection{Gravitasi}
+
+\model{Momen gravitasi benda tegar tak seimbang}
+
+Massa berputar pada sumbu kemiringan $m_2 = 3{,}055$~kg (rangka elevasi $0{,}505$~kg ditambah panel
+$2{,}55$~kg), dengan pusat massa bergeser $c_y = 9{,}04$~mm dan $c_z = 49{,}93$~mm dari sumbu engsel:
+\begin{equation}
+\bm{g}(\bm{q}) = \begin{bmatrix} 0 \\ -m_2 g \left( c_y \cos q_2 - c_z \sin q_2 \right) \end{bmatrix},
+\qquad g = 10 \ \mathrm{m/s^2} \ \text{(keputusan)}.
+\label{eq:grav}
+\end{equation}
+
+\begin{longtable}{l r r}
+\toprule
+\textbf{Posisi} & \textbf{Momen gravitasi} & \textbf{Defleksi statis} \\
+\midrule
+$q_2 = 0$ & $0{,}276$ N\,m & $0{,}155\degg$ (prediksi), $\bm{0{,}161\degg}$ \textbf{terukur Gazebo} \\
+$q_2 = -45\degg$ & $\bm{1{,}274}$ \textbf{N\,m} (maksimum) & $0{,}717\degg$ \\
+\bottomrule
+\end{longtable}
+
+\subsection{Gesekan}
+
+\model{Gesekan viskos dan Coulomb (model Coulomb-viskos)}
+\begin{equation}
+\bm{F}(\dot{\bm{q}}) =
+\begin{bmatrix} b_1 \dot q_1 + \tau_{c1}\operatorname{sgn}(\dot q_1) \\
+b_2 \dot q_2 + \tau_{c2}\operatorname{sgn}(\dot q_2) \end{bmatrix},
+\qquad b = 0{,}2 \ \mathrm{N\,m\,s/rad}, \quad \tau_c = 0{,}05 \ \mathrm{N\,m}.
+\end{equation}
+Keduanya \textbf{ASUMSI} dan belum diukur. Keduanya paling menentukan lama ayunan, dan dapat diperoleh
+sekaligus lewat uji peluruhan bebas (Bagian~\ref{sec:asumsi}).
+
+\subsection{Ruang keadaan tak linier}
+
+\model{Representasi ruang keadaan orde satu}
+
+Dengan $\bm{x} = [q_1, q_2, \dot q_1, \dot q_2]^T$:
+\begin{equation}
+\dot{\bm{x}} =
+\begin{bmatrix}
+\dot{\bm{q}} \\
+\bm{M}^{-1}(\bm{q})\left[ \bm{\tau} - \bm{C}(\bm{q},\dot{\bm{q}})\dot{\bm{q}}
+- \bm{g}(\bm{q}) - \bm{F}(\dot{\bm{q}}) - \bm{\tau}_w \right]
+\end{bmatrix}.
+\end{equation}
+
+\subsection{Nilai eigen dan pembuktian kestabilan}
+
+\model{Linearisasi Jacobian dan analisis nilai eigen sistem orde dua}
+
+Di sekitar titik kerja, tiap sumbu menjadi sistem orde dua dengan kekakuan efektif $K$ (Bagian~\ref{sec:step})
+dan redaman $b$. Dengan $\bm{x} = [q,\dot q]^T$:
+\begin{equation}
+\bm{F}_{\mathrm{dyn}} = \frac{\partial \bm{f}}{\partial \bm{x}} =
+\begin{bmatrix} 0 & 1 \\ -K/J & -b/J \end{bmatrix},
+\qquad
+\lambda_{1,2} = -\zeta\omega_n \pm j\,\omega_n\sqrt{1-\zeta^2},
+\end{equation}
+dengan $\omega_n = \sqrt{K/J}$ dan $\zeta = b/(2\sqrt{KJ})$.
+
+\begin{longtable}{l c c c c c}
+\toprule
+\textbf{Sumbu} & \textbf{Nilai eigen} & $\mathrm{Re}(\lambda)$ & $f_n$ & $\zeta$ & $\tau_{\text{peluruhan}}$ \\
+\midrule
+Azimuth & $-0{,}661 \pm 30{,}09j$ & $-0{,}661$ & $\bm{4{,}79}$ \textbf{Hz} & $0{,}0219$ & $1{,}51$ s \\
+Kemiringan & $-1{,}842 \pm 43{,}26j$ & $-1{,}842$ & $\bm{6{,}89}$ \textbf{Hz} & $0{,}0425$ & $0{,}54$ s \\
+\bottomrule
+\end{longtable}
+
+\textbf{Bagian nyata negatif untuk kedua sumbu, sehingga sistem stabil asimtotik dan panel pasti kembali ke
+titik setimbang setelah bergerak.} Itu pembuktian formal yang diminta.
+
+\model{Lewatan sistem orde dua kurang teredam}
+\begin{equation}
+M_p = \exp\!\left( \frac{-\pi\zeta}{\sqrt{1-\zeta^2}} \right)
+\;\Longrightarrow\;
+M_p^{\mathrm{az}} = 93{,}3\%, \qquad M_p^{\mathrm{el}} = 87{,}5\%.
+\end{equation}
+\textbf{Terukur di Gazebo: $90\%$ dan $82\%$} untuk langkah $1\degg$. Selisihnya berasal dari gesekan Coulomb
+yang tidak termasuk dalam model linier.
+
+%=====================================================================
+\section{Aktuator: Motor Stepper Loop Terbuka}
+\label{sec:step}
+
+Bagian ini tidak ada dalam kerangka rujukan, tetapi menentukan seluruh rancangan kontrol di sini.
+
+\subsection{Hukum torsi-sudut}
+
+\model{Model torsi-sudut sinusoidal motor stepper hibrid}
+
+Motor digerakkan pulsa posisi, bukan perintah torsi. Torsi pemulih bergantung selisih sudut listrik:
+\begin{equation}
+\tau = T_h \sin\!\Big( N_r \big( \theta_{\mathrm{cmd}} - \theta_{\mathrm{beban}} - \tau/k \big) \Big),
+\qquad T_h = 3 \ \mathrm{N\,m}, \quad N_r = 50,
+\label{eq:stepper}
+\end{equation}
+dengan $k$ kekakuan puntir poros. Persamaan ini implisit terhadap $\tau$ dan diselesaikan secara numerik;
+penyelesaiannya tunggal selama $k > T_h N_r$.
+
+\subsection{Kekakuan seri}
+
+\model{Pegas seri (motor dan poros)}
+\begin{equation}
+K = \left( \frac{1}{T_h N_r} + \frac{1}{k} \right)^{-1}
+\;\Longrightarrow\;
+K_{\mathrm{az}} = 137{,}14, \qquad K_{\mathrm{el}} = 101{,}82 \ \mathrm{N\,m/rad}.
+\end{equation}
+
+\subsection{Kuantisasi microstep dan kejenuhan}
+
+\model{Kuantisasi seragam (zero-order hold spasial)}
+\begin{equation}
+\theta_{\mathrm{cmd}} = \Delta_\mu \left\lfloor \frac{\theta_{\mathrm{ref}}}{\Delta_\mu} \right\rceil,
+\qquad \Delta_\mu = \frac{1{,}8\degg}{16} = 0{,}1125\degg .
+\end{equation}
+Tangga inilah \textbf{sumber eksitasi ayunan saat menjejak}, bukan gangguan luar.
+
+Bila torsi luar melewati $T_h$ motor kehilangan sinkron dan beban lari sejauh kelipatan siklus listrik
+$360\degg/N_r = 7{,}2\degg$. \textbf{Lepas langkah tidak pernah pulih sendiri} karena tidak ada enkoder.
+
+%=====================================================================
+\section{Strategi Kontrol}
+
+Kerangka rujukan mengusulkan \emph{Computed Torque Control},
+$\bm{\tau} = \bm{M}(\ddot{\bm{q}}_d + K_v\dot{\bm{e}} + K_p\bm{e}) + \bm{C}\dot{\bm{q}} + \bm{g} + \bm{F}$,
+dan \emph{Sliding Mode Control} dengan permukaan $S = \dot{\bm{e}} + \Lambda\bm{e}$. \textbf{Keduanya
+menuntut $\bm{q}$ dan $\dot{\bm{q}}$ terukur tiap siklus serta kemampuan mengatur torsi sesaat; alat ini
+tidak memiliki keduanya.} Penggantinya tiga lapis berikut.
+
+\subsection{Umpan maju astronomis}
+
+Lintasan sendi dihitung dari SPA lewat kinematika balik, dibatasi $|q_2| \le 45\degg$.
+
+\subsection{Profil gerak}
+
+\model{Profil kecepatan trapesium dengan batas percepatan}
+\begin{equation}
+\dot q_{\mathrm{des}} = \operatorname{sgn}(e)\min\!\left( v_{\max}, \sqrt{2 a_{\max} |e|} \right),
+\qquad v_{\max} = 90\degg/\mathrm{s}, \quad a_{\max} = 300\degg/\mathrm{s^2},
+\end{equation}
+dengan $e = q_{\mathrm{ref}} - q$. Bentuk akar memastikan berhenti tepat di sasaran tanpa lewatan perintah.
+
+\subsection{Peredam ayunan}
+
+\model{Input shaper ZV dan ZVD (Singer dan Seering)}
+
+Deret impuls dikonvolusikan dengan perintah agar getaran sisa saling meniadakan. Dengan
+$K_s = \exp\!\big(-\pi\zeta/\sqrt{1-\zeta^2}\big)$ dan jeda $\Delta t = T_d/2 = \big(2 f_n\sqrt{1-\zeta^2}\big)^{-1}$:
+\begin{align}
+\text{ZV:}\quad & \bm{A} = \frac{1}{1+K_s}\begin{bmatrix} 1 & K_s \end{bmatrix},
+&& \bm{t} = \begin{bmatrix} 0 & \Delta t \end{bmatrix}, \\
+\text{ZVD:}\quad & \bm{A} = \frac{1}{(1+K_s)^2}\begin{bmatrix} 1 & 2K_s & K_s^2 \end{bmatrix},
+&& \bm{t} = \begin{bmatrix} 0 & \Delta t & 2\Delta t \end{bmatrix}.
+\end{align}
+ZVD menambah satu impuls agar tahan terhadap galat taksiran $f_n$, dengan ongkos satu $\Delta t$ tambahan.
+
+\textbf{Hasil terukur di Gazebo}, lompatan azimuth $181\degg$, lima ulangan:
+
+\begin{longtable}{l r r}
+\toprule
+\textbf{Strategi} & \textbf{Lewatan median} & \textbf{Lewatan terburuk} \\
+\midrule
+Hanya profil trapesium & $0{,}58\%$ ($1{,}05\degg$) & $\bm{10{,}71\%}$ ($\bm{19{,}35\degg}$) \\
+\textbf{Profil + ZVD} & $0{,}11\%$ ($0{,}20\degg$) & $\bm{1{,}27\%}$ ($\bm{2{,}30\degg}$) \\
+\bottomrule
+\end{longtable}
+
+Perbandingan langkah tunggal (model Python / Gazebo):
+
+\begin{longtable}{l r r r r}
+\toprule
+\textbf{Uji} & \textbf{Mentah} & \textbf{Trapesium} & \textbf{ZV} & \textbf{ZVD} \\
+\midrule
+Azimuth $90\degg$ & $52{,}43 / 52{,}41\%$ & $0{,}88 / 0{,}77\%$ & $3{,}07 / 0{,}00\%$ & $0{,}26 / 0{,}00\%$ \\
+Azimuth $5\degg$ & $82{,}60 / 82{,}78\%$ & $15{,}46 / 15{,}77\%$ & $0{,}32 / 0{,}40\%$ & $0{,}97 / 0{,}85\%$ \\
+\bottomrule
+\end{longtable}
+
+\textbf{Batas penting.} Input shaper \emph{tidak berguna saat menjejak pelan}: satu microstep tidak dapat
+dipecah menjadi dua setengah langkah, sehingga setelah pembulatan perintahnya identik. Satu-satunya tuas
+saat menjejak adalah memperhalus $\Delta_\mu$.
+
+Sebab tambahan: pada lompatan besar pengendali \emph{jenuh} di $T_h$ sehingga geraknya bang-bang, dan
+input shaper yang mengandaikan sistem linier sama sekali tidak berefek (terukur: lewatan $71{,}2\%$ identik
+dengan dan tanpa ZV). Karena itu shaper harus dipasang \emph{di atas} profil trapesium.
+
+%=====================================================================
+\section{Model Listrik Panel Surya}
+\label{sec:arus}
+
+\subsection{Persamaan dioda tunggal}
+
+\model{Model dioda tunggal lima parameter (De Soto, Klein, Beckman); persamaan Shockley}
+
+\begin{equation}
+I = I_L - I_0\left[ \exp\!\left( \frac{V + I R_s}{a} \right) - 1 \right] - \frac{V + I R_s}{R_{sh}},
+\qquad a = \frac{n N_s k T_c}{q},
+\label{eq:diode}
+\end{equation}
+dengan $I_L$ arus cahaya, $I_0$ arus jenuh balik, $R_s$ tahanan seri, $R_{sh}$ tahanan bocor, $n$ faktor
+ideal, dan $N_s$ jumlah sel seri.
+
+Parameter dicocokkan ke pelat nama MOS C-50-18-M dengan empat syarat: titik hubung singkat, titik rangkaian
+terbuka, titik daya maksimum, dan $\partial P/\partial V = 0$ di titik daya maksimum.
+
+\begin{longtable}{l r l r}
+\toprule
+\textbf{Parameter} & \textbf{Nilai} & \textbf{Reproduksi STC} & \textbf{Model} \\
+\midrule
+$I_L$ & $3{,}0092$ A & $I_{sc}$ & $3{,}000$ A \\
+$I_0$ & $7{,}02\times10^{-10}$ A & $V_{oc}$ & $22{,}50$ V \\
+$R_s$ & $0{,}372\ \Omega$ & $I_{mp}$ & $2{,}700$ A \\
+$R_{sh}$ & $121{,}5\ \Omega$ & $V_{mp}$ & $18{,}50$ V \\
+$n$ & $1{,}1$ & $P_{\max}$ & $49{,}95$ W \\
+\bottomrule
+\end{longtable}
+
+Faktor ideal $n$ tidak dapat ditentukan dari pelat nama (empat persamaan, lima anu); diperiksa bahwa
+$n \in [1{,}0;\,1{,}5]$ mengubah arus hanya $0{,}13\%$, sehingga pilihannya tidak kritis.
+
+\subsection{Suhu sel}
+
+\model{Model NOCT (Nominal Operating Cell Temperature)}
+\begin{equation}
+T_c = T_a + \frac{\mathrm{NOCT} - 20\degg\mathrm{C}}{800\ \mathrm{W/m^2}}\, G_{\mathrm{POA}},
+\qquad \mathrm{NOCT} = 45\degg\mathrm{C} \ \text{(ASUMSI)}.
+\end{equation}
+Koefisien daya terhitung $-0{,}497\%/\degg$C, wajar untuk silikon. Efisiensi modul STC $16{,}75\%$.
+
+\subsection{Arus sebagai sensor arah: dua batas mendasar}
+
+\textbf{Pertama, memaksimalkan arus tidak mengarahkan panel ke matahari.} Akibat dua suku sebaran pada
+Persamaan~\eqref{eq:poa}, puncak arus bergeser:
+
+\begin{longtable}{l r l}
+\toprule
+\textbf{Albedo $\rho_g$} & \textbf{Pergeseran puncak} & \textbf{Contoh permukaan} \\
+\midrule
+$0{,}10$ & $-2{,}75\degg$ & aspal, tanah basah \\
+$0{,}25$ & $-0{,}10\degg$ & nilai bawaan model \\
+$0{,}40$ & $+2{,}75\degg$ & beton terang, pasir \\
+\bottomrule
+\end{longtable}
+
+Dengan komponen langsung saja puncaknya tepat di $0\degg$. \textbf{Albedo lokasi harus diukur} bila arus
+dipakai sebagai acuan posisi.
+
+\textbf{Kedua, arus buta terhadap galat kecil.} Karena Persamaan~\eqref{eq:cosloss} bersifat kuadratik di
+dekat puncak, simpangan $2\degg$ hanya mengubah arus $0{,}09\%$, jauh di bawah toleransi pabrik $\pm3\%$.
+Lebih jauh, perubahan arus akibat awan \textbf{dua sampai tiga orde} lebih besar daripada akibat salah arah:
+
+\begin{longtable}{l r r}
+\toprule
+\textbf{Tutupan awan} & \textbf{Turun karena awan} & \textbf{Turun karena salah arah $5\degg$} \\
+\midrule
+Okta 2 & $-1{,}0\%$ & $-0{,}29\%$ \\
+Okta 4 & $-10{,}7\%$ & $-0{,}06\%$ \\
+Okta 6 & $-40{,}8\%$ & $+0{,}96\%$ \\
+\bottomrule
+\end{longtable}
+
+Pendakian bukit (\emph{perturb and observe}) memakai arus berhasil saat cerah dan tenang (berhenti
+$0{,}30\degg$ dari puncak) tetapi \textbf{tersesat sampai $51\degg$} ketika awan menipis $2\%$ per detik.
+
+%=====================================================================
+\section{Sensor LDR dan Penggabungan Berbobot}
+\label{sec:fusi}
+
+\subsection{Model pembacaan}
+
+\model{Pembagi tegangan dengan LDR hukum pangkat, dan sekat pembayang}
+
+Hambatan LDR mengikuti hukum pangkat terhadap iluminansi, sehingga tegangan keluaran pembagi bersifat jenuh:
+\begin{equation}
+x = \left( \frac{E}{L_0} \right)^{\gamma}, \qquad
+V = V_{cc}\,\frac{x}{1+x} + \nu, \qquad \nu \sim \mathcal{N}(0, \sigma_{\mathrm{ADC}}^2),
+\end{equation}
+dengan $\gamma = 0{,}7$ dan $L_0 = 20000$ lux (keduanya ASUMSI). Sekat membayangi komponen \emph{langsung}
+sebanding $r\tan\varepsilon$ dengan $\varepsilon$ sudut miring matahari terhadap sisi LDR.
+
+Sinyal selisih yang dipakai:
+\begin{equation}
+e_x = \frac{V_{x+} - V_{x-}}{V_{x+} + V_{x-}}, \qquad
+e_y = \frac{V_{y+} - V_{y-}}{V_{y+} + V_{y-}} .
+\label{eq:ldr}
+\end{equation}
+Pembagian dengan jumlah membuat sinyal tahan terhadap perubahan irradiance menyeluruh.
+
+\subsection{Pemisahan derau dan bias}
+
+Ketidakpastian taksiran sudut adalah derau sinyal dibagi kepekaan, $\sigma_q = \sigma_e / |\partial e/\partial q|$.
+Diukur Monte Carlo dengan ketidakcocokan antar sensor diundi \emph{sekali per perangkat}:
+
+\begin{longtable}{l r r r r}
+\toprule
+\textbf{Langit} & \textbf{Derau acak $q_2$} & \textbf{Bias $q_2$} & \textbf{Derau acak $q_1$} & \textbf{Bias $q_1$} \\
+\midrule
+Cerah & $0{,}44\degg$ & $\bm{2{,}86\degg}$ & $0{,}60\degg$ & $\bm{4{,}68\degg}$ \\
+Mendung okta 6 & $0{,}69\degg$ & $\bm{5{,}20\degg}$ & $0{,}94\degg$ & $\bm{8{,}54\degg}$ \\
+\bottomrule
+\end{longtable}
+
+\textbf{Yang menguasai bukan derau, melainkan bias}, lima sampai sepuluh kali lebih besar. Derau dapat
+ditekan dengan merata-rata; bias hanya hilang dengan kalibrasi.
+
+\subsection{Penggabungan bobot kebalikan ragam}
+
+\model{Penaksir bobot kebalikan ragam (inverse-variance weighting, BLUE)}
+
+Untuk dua taksiran tak bias dan bebas:
+\begin{equation}
+\hat{x} = \frac{\sigma_2^2 \hat{x}_1 + \sigma_1^2 \hat{x}_2}{\sigma_1^2 + \sigma_2^2},
+\qquad \frac{1}{\sigma^2} = \frac{1}{\sigma_1^2} + \frac{1}{\sigma_2^2}.
+\end{equation}
+
+\begin{longtable}{l r r r r}
+\toprule
+\textbf{Ketidakcocokan LDR} & $\sigma_{q_2}$ & $\sigma_{q_1}$ & \textbf{Bobot LDR $q_2$} & \textbf{Bobot LDR $q_1$} \\
+\midrule
+$3\%$ (tanpa kalibrasi) & $2{,}92\degg$ & $4{,}08\degg$ & $\bm{20{,}9\%}$ & $\bm{11{,}9\%}$ \\
+$1\%$ (kalibrasi kasar) & $1{,}03\degg$ & $1{,}46\degg$ & $67{,}8\%$ & $51{,}4\%$ \\
+$0{,}3\%$ (kalibrasi teliti) & $0{,}51\degg$ & $0{,}71\degg$ & $\bm{89{,}5\%}$ & $\bm{81{,}8\%}$ \\
+\bottomrule
+\end{longtable}
+
+Bobot LDR untuk azimuth turun \emph{sendiri} dari $9{,}2\%$ pada $q_2 = 45\degg$ menjadi $0{,}5\%$ pada
+$q_2 = 10\degg$, karena $\partial e_y/\partial q_1 \propto \sin q_2$. Efek keyhole muncul kembali sebagai
+bobot, tanpa aturan ambang buatan.
+
+\subsection{Prosedur kalibrasi}
+
+\textbf{Prosedur A, cahaya baur merata.} Sekat hanya membayangi komponen langsung, sehingga di bawah cahaya
+baur murni keempat LDR menerima iluminansi sama berapa pun arah panel. Faktor koreksi dicari di ruang
+$x = V/(V_{cc}-V)$:
+\begin{equation}
+m_i = \left( \frac{x_i}{\bar{x}} \right)^{1/\gamma}, \qquad c_i = 1/m_i .
+\end{equation}
+Diperiksa: faktor koreksi identik sampai satu bagian per juta pada tiga pose berbeda. Di lapangan cukup
+menunggu mendung tebal (okta 8 menyisakan DNI hanya $2{,}2\%$).
+
+\textbf{Prosedur B, regresi sepanjang hari.} Salah pasang menghasilkan $e = \kappa\,\delta$ yang ikut
+berubah ketika kepekaan $\kappa$ berubah, sedangkan ketidakcocokan menghasilkan offset hampir tetap:
+\begin{equation}
+e[k] = \kappa[k]\,\delta + c + \varepsilon[k].
+\end{equation}
+Kepekaan azimuth berubah $25{,}6$ kali sepanjang hari, kemiringan hanya $1{,}1$ kali. Hasilnya bias azimuth
+terpisahkan dengan baik (taksiran $1{,}50\degg$ dari sebenarnya $1{,}50\degg$), bias kemiringan tidak
+($0{,}84$ dari $1{,}00$, bilangan kondisi $23936$).
+
+%=====================================================================
+\section{Beban Angin dari Data Terukur}
+
+\subsection{Sumber dan koreksi ketinggian}
+
+\model{Reanalisis Open-Meteo (ERA5); profil pangkat Hellmann}
+
+Data: $102{,}984$ jam reanalisis per jam untuk titik PENS, 2015 sampai 2026, lengkap dengan arah dan
+hembusan. Reanalisis berlaku pada $10$~m; panel hanya $0{,}3$~m di atas tanah:
+\begin{equation}
+v(z) = v_{10}\left( \frac{z}{10} \right)^{\alpha}, \qquad \alpha = 0{,}30 \ \text{(ASUMSI, kampus)}.
+\end{equation}
+
+\begin{longtable}{l r r}
+\toprule
+& \textbf{Pada 10 m} & \textbf{Di panel 0,3 m} \\
+\midrule
+Kecepatan rata-rata & $2{,}83$ m/s & $0{,}99$ m/s \\
+Kecepatan maksimum & $9{,}33$ m/s & $3{,}26$ m/s \\
+\textbf{Hembusan maksimum 11 tahun} & $\bm{17{,}81}$ \textbf{m/s} & $\bm{6{,}22}$ \textbf{m/s} \\
+\bottomrule
+\end{longtable}
+
+Arah didominasi Timur ($34{,}3\%$), pola monsun. Maksimum hembusan tahunan sangat stabil (rata $16{,}28$ m/s,
+simpangan baku $1{,}29$), karena Surabaya terlalu dekat ekuator untuk siklon tropis.
+
+\subsection{Model torsi berarah}
+
+\model{Gaya normal pelat datar}
+
+Angin dari bearing $\varphi$ berjalan menuju $\varphi + 180\degg$:
+\begin{equation}
+\what = \big[ -\cos\varphi,\ \sin\varphi,\ 0 \big]^T,
+\qquad
+F = \tfrac{1}{2}\rho v^2 A\, C_n \left( \what \cdot \nhat \right).
+\end{equation}
+Dengan pergeseran pusat tekanan $e_c$ searah \emph{chord} dan $e_s$ searah \emph{span}, dan karena $\bm{F}$
+sejajar $\nhat$ sehingga $\bm{r}\times\bm{F} = -e_c F\,\yp + e_s F\,\xp$:
+\begin{equation}
+\boxed{\;
+\tau_{\mathrm{el}} = -e_c F, \qquad
+\tau_{\mathrm{az}} = -e_s F \sin q_2 \; }
+\label{eq:wind}
+\end{equation}
+
+\textbf{Torsi azimuth nol saat panel datar}, karena gaya tegak lurus panel datar tidak dapat memuntir sumbu
+tegak. Model buta arah pada kerangka rujukan tidak memiliki sifat ini.
+
+\textbf{Tervalidasi di Gazebo:} pengali $1$, $2$, dan $3$ memberi $0{,}45\%$, $1{,}80\%$, dan $4{,}04\%$
+torsi tahan; rasio $4$ dan $9$ terbaca persis sesuai $v^2$. Tanda torsi juga berbalik antara pagi dan siang
+karena orientasi panel berubah.
+
+\subsection{Margin terhadap lepas sinkron}
+
+\begin{longtable}{l r r}
+\toprule
+\textbf{Kasus} & $v$ \textbf{di panel} & \textbf{\% torsi tahan} \\
+\midrule
+\textbf{Terburuk 11 tahun} & $6{,}22$ m/s & $\bm{9{,}2\%}$ \\
+Pengali $1{,}5$ & $9{,}33$ m/s & $20{,}8\%$ \\
+Pengali $2$ & $12{,}44$ m/s & $37{,}0\%$ \\
+Pengali $3$ & $18{,}66$ m/s & $83{,}1\%$ \\
+\bottomrule
+\end{longtable}
+
+\textbf{Angin bukan risiko bagi alat ini}, dengan margin sekitar sebelas kali. Preset sintetis
+(\emph{tenang}, \emph{berangin}, \emph{badai}) karena itu dibuang dan diganti pengali terhadap data nyata.
+
+%=====================================================================
+\section{Osilasi dan Dampaknya pada Energi}
+
+Ayunan diukur pada laju penuh $1000$~Hz, dengan gerak jejak lambat dibuang lewat penapis lolos tinggi
+(rata-rata bergerak di atas $2$~Hz):
+
+\begin{longtable}{l r r}
+\toprule
+\textbf{Keadaan} & \textbf{Ayunan puncak ke puncak} & \textbf{Frekuensi terukur} \\
+\midrule
+Menjejak dekat transit zenith & az $1{,}90\degg$, el $0{,}72\degg$ & $5{,}19$ dan $6{,}57$ Hz \\
+Setelah lompat jam besar & az $4{,}53\degg$, el $5{,}44\degg$ & \\
+Sembilan detik kemudian & $0{,}000\degg$ & \\
+\bottomrule
+\end{longtable}
+
+Frekuensi terukur $5{,}19$ dan $6{,}57$~Hz \textbf{cocok dengan prediksi nilai eigen} $4{,}79$ dan
+$6{,}89$~Hz, dan peluruhan sembilan detik sesuai konstanta waktu $1{,}51$~s.
+
+\begin{longtable}{l r r}
+\toprule
+\textbf{Penyebab rugi energi} & \textbf{Besarnya} & \\
+\midrule
+Suhu sel $55\degg$C dibanding $25\degg$C & $\bm{14{,}9\%}$ & \\
+Toleransi pabrik panel & $3{,}0\%$ & \\
+Defleksi gravitasi $0{,}72\degg$ & $0{,}008\%$ & \\
+\textbf{Ayunan motor saat menjejak} & $\bm{0{,}007\%}$ & \\
+\bottomrule
+\end{longtable}
+
+\textbf{Osilasi hampir tidak merugikan energi}, dua ribu kali lebih kecil daripada pengaruh suhu. Dampak
+harian lompatan besar lima kali sehari hanya $0{,}19$~mWh dari panen $431$~Wh. Peredam ZVD tetap diperlukan,
+tetapi alasannya beban mekanik, risiko lepas sinkron, dan derau ke sensor, bukan panen energi.
+
+%=====================================================================
+\section{Tapis Kalman Diperluas sebagai Pengganti Enkoder}
+\label{sec:ekf}
+
+\subsection{Keadaan yang ditaksir}
+
+Kerangka rujukan mengusulkan UKF menaksir parameter fisis
+$\bm{\theta} = [m_2, r_c, b_1, b_2, C_{m,A}, C_{m,E}]$. Karena tidak ada enkoder, yang lebih mendesak adalah
+\emph{simpangan} antara perintah dan beban:
+\begin{equation}
+\bm{b} = \begin{bmatrix} b_{\mathrm{az}} \\ b_{\mathrm{el}} \end{bmatrix}
+= \bm{q}_{\mathrm{beban}} - \bm{q}_{\mathrm{perintah}},
+\end{equation}
+yang memuat salah pasang mekanik, \textbf{lepas langkah terkumpul}, dan sisa defleksi.
+
+\subsection{Persamaan tapis}
+
+\model{Extended Kalman Filter, bentuk kovarians Joseph}
+
+Model proses jalan acak ($\bm{F} = \bm{I}$) karena lepas langkah tidak dapat diramalkan:
+\begin{align}
+\text{Prediksi:} \quad & \hat{\bm{b}}^- = \hat{\bm{b}}, \qquad
+\bm{P}^- = \bm{P} + \bm{Q}\,\Delta t, \\
+\text{Inovasi:} \quad & \bm{y} = \bm{z} - h(\hat{\bm{b}}^-), \qquad
+\bm{H} = \left.\frac{\partial h}{\partial \bm{b}}\right|_{\hat{\bm{b}}^-}, \qquad
+\bm{S} = \bm{H}\bm{P}^-\bm{H}^T + \bm{R}, \\
+\text{Penguatan:} \quad & \bm{K} = \bm{P}^-\bm{H}^T\bm{S}^{-1}, \qquad
+\hat{\bm{b}} = \hat{\bm{b}}^- + \bm{K}\bm{y}, \\
+\text{Kovarians:} \quad & \bm{P} = (\bm{I}-\bm{K}\bm{H})\bm{P}^-(\bm{I}-\bm{K}\bm{H})^T + \bm{K}\bm{R}\bm{K}^T .
+\end{align}
+Bentuk Joseph dipakai agar $\bm{P}$ tetap simetris dan definit positif.
+
+Fungsi pengukuran $h$ adalah model LDR Persamaan~\eqref{eq:ldr}, sehingga $\bm{H}$ mengandung Jacobian
+kinematik; itulah pertemuan antara singularitas keyhole dan kovarians tapis.
+
+\model{Uji pencilan khi-kuadrat atas inovasi ternormalkan (NIS)}
+\begin{equation}
+\epsilon = \bm{y}^T \bm{S}^{-1} \bm{y} \;\sim\; \chi^2_{m}, \qquad
+\text{pengukuran ditolak bila } \epsilon > \epsilon_{\max} = 25 .
+\end{equation}
+
+\subsection{Hasil terukur}
+
+Hari 7 Oktober 2026, lepas langkah azimuth $7{,}2\degg$ disuntikkan di tengah hari; galat diukur hanya saat
+matahari terjangkau:
+
+\begin{longtable}{l r r}
+\toprule
+\textbf{Susunan} & \textbf{Galat rata-rata} & \textbf{p95} \\
+\midrule
+Astro saja, tanpa tapis & $2{,}52\degg$ & $5{,}30\degg$ \\
+\textbf{EKF + LDR terkalibrasi} & $\bm{0{,}18\degg}$ & $0{,}39\degg$ \\
+EKF + LDR $3\%$ tidak terkalibrasi & $\bm{5{,}63\degg}$ & $6{,}10\degg$ \\
+EKF + LDR terkalibrasi + arus & $0{,}18\degg$ & $0{,}39\degg$ \\
+EKF + arus saja & $2{,}24\degg$ & $5{,}17\degg$ \\
+\bottomrule
+\end{longtable}
+
+Tapis pulih dari lepas langkah $7{,}2\degg$ dalam sekitar $350$~detik \textbf{tanpa pernah diberi tahu}
+bahwa lepas langkah terjadi.
+
+\textbf{Tiga kesimpulan.} (i)~LDR terkalibrasi memperbaiki empat belas kali. (ii)~\textbf{LDR tidak
+terkalibrasi lebih buruk daripada tidak memakai LDR sama sekali}: bias LDR tidak dapat dibedakan dari salah
+pasang mekanik (tidak teramati secara terpisah), sehingga tapis menyerapnya lalu mengarahkan panel keliru.
+(iii)~Arus hampir tidak menambah apa pun, sesuai $\partial I/\partial \bm{b} \approx 0$ di dekat puncak.
+
+\subsection{Keyhole sebagai kovarians}
+
+\begin{longtable}{l r r}
+\toprule
+\textbf{Keadaan} & $\partial e_y/\partial b_{\mathrm{az}}$ & $\sigma_{\mathrm{az}}$ \textbf{dilaporkan} \\
+\midrule
+Matahari elevasi $45\degg$ & $0{,}00091$ & $0{,}67\degg$ \\
+Matahari elevasi $85\degg$ & $0{,}00019$ & $\bm{2{,}65\degg}$ \\
+\bottomrule
+\end{longtable}
+
+\subsection{Dua pengaman yang wajib}
+
+Keduanya ditemukan ketika loop tertutup menyimpang di Gazebo.
+
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{LDR hanya dipakai saat matahari terjangkau.} Bila zenith melewati $45\degg$, kemiringan
+terpotong dan LDR membaca galat besar yang bukan berasal dari simpangan sendi.
+\item \textbf{Anti-penyimpangan pada gerbang pencilan.} Bila taksiran telanjur salah, inovasi membesar,
+gerbang menolak semua pengukuran, dan tapis terkunci selamanya (terukur: NIS tetap $82$ sampai $90$,
+taksiran macet di $-6{,}47\degg$). Setelah sepuluh penolakan beruntun, $\bm{P}$ digembungkan.
+\end{enumerate}
+
+\subsection{Pelajaran tentang matriks kovarians pengukuran}
+
+Matriks $\bm{R}$ untuk pengukuran arus \textbf{wajib memuat galat model}, bukan hanya derau sensor:
+\begin{equation}
+R_I = \sigma_{\mathrm{ADC}}^2 + \left( \kappa_{\mathrm{model}} \hat{I} \right)^2,
+\qquad \kappa_{\mathrm{model}} = 0{,}03 .
+\end{equation}
+Mengisinya dengan derau ADC $0{,}2$~mA saja membuat $\bm{K} = \bm{P}\bm{H}^T\bm{S}^{-1}$ ribuan kali terlalu
+besar, dan \textbf{galat pointing melonjak dari $0{,}18\degg$ menjadi $20{,}5\degg$}.
+
+\subsection{Kejujuran tapis}
+
+Tapis masih \emph{terlalu percaya diri} sekitar $3{,}4$ kali pada azimuth: $\sigma$ dilaporkan $0{,}23\degg$
+sedangkan sebaran galat sebenarnya $0{,}79\degg$. Sebabnya $\bm{Q}$ berbentuk jalan acak halus sedangkan
+lepas langkah datang sebagai lompatan.
+
+%=====================================================================
+\section{Arsitektur Cyber-Physical System}
+
+\begin{Verbatim}[fontsize=\small,frame=single]
+ +--------------------------------------------------------------------+
+ |                        LAPISAN CYBER                               |
+ |  sun_command_node  -->  profil trapesium + ZVD  <--  ekf_node      |
+ |  (pvlib SPA, IK)        (100 Hz)                     (taksir b, P) |
+ |  sensor_node  --> /tracker/diag (5 Hz), /ldr/state        ^        |
+ |  wind_node    --> angin nyata berarah (Open-Meteo)        |        |
+ +-----------------------------+------------------------------+------+
+                               | perintah posisi (rad)        |
+ +-----------------------------v------------------------------+------+
+ | LAPISAN ANTARMUKA : ros_gz_bridge                                  |
+ |   kuantisasi microstep 0,1125 deg   <-- Q(.)                       |
+ |   kejenuhan torsi 3 N m             <-- Sat(.)                     |
+ +-----------------------------+------------------------------+------+
+                               | tau(t)         /joint_states (1 kHz) |
+ +-----------------------------v------------------------------+------+
+ | LAPISAN FISIK : Gazebo DART, langkah 1 ms                          |
+ |   M(q) qdd + C(q,qd) qd + g(q) + F(qd) + tau_w = tau               |
+ |   gangguan: angin berarah, defleksi gravitasi, lepas langkah       |
+ +--------------------------------------------------------------------+
+\end{Verbatim}
+
+\begin{longtable}{p{5.2cm} p{5.6cm} p{4.0cm}}
+\toprule
+\textbf{Kerangka rujukan} & \textbf{Di sistem ini} & \textbf{Status} \\
+\midrule
+\endhead
+Plant dinamika kontinu & Gazebo DART, langkah 1 ms & berjalan \\
+Kuantisasi $Q(\cdot)$ & pembulatan microstep $0{,}1125\degg$ & berjalan \\
+Kejenuhan $\mathrm{Sat}(\cdot)$ & batas torsi $3$ N\,m & berjalan \\
+Algoritma orbit astronomis & pvlib SPA & tervalidasi $0{,}011\degg$ \\
+Pengendali diskret & node ROS 2, 100 Hz & berjalan \\
+Penaksir keadaan (EKF) & \texttt{ekf\_node} & berjalan \\
+Enkoder kuadratur & \textbf{tidak ada} & diganti EKF + LDR \\
+Latensi jaringan, jitter & \textbf{belum dimodelkan} & kekurangan \\
+Serangan FDI, NTP poisoning & \textbf{belum dimodelkan} & kekurangan \\
+Event-triggered control & \textbf{belum ada} & kekurangan \\
+\bottomrule
+\end{longtable}
+
+\textbf{Catatan tentang jam.} Seluruh node memakai \texttt{use\_sim\_time}. Tanpa itu, profil gerak dan
+input shaper berjalan pada jam dinding sedangkan plant pada jam simulasi (Gazebo sekitar $85\%$
+real-time), sehingga lewatan menjadi tidak dapat diulang: terukur $7{,}6\%$ sampai $0{,}35\%$ pada uji
+yang sama.
+
+\subsection{Model keadaan hibrid}
+
+\model{Sistem sampled-data dengan tundaan dan kuantisasi}
+
+Kerangka rujukan menuliskan bentuk hibrid yang relevan dan belum diterapkan di sini:
+\begin{align}
+\tilde{\bm{y}}[k] &= Q\big( \bm{x}(kT_s - \tau_{d,s}) \big) + \bm{v}[k], \\
+\bm{u}_c[k] &= \mathcal{C}\big( \tilde{\bm{y}}[k], \bm{q}_d[k], \hat{\bm{\theta}}[k] \big), \\
+\bm{\tau}(t) &= \mathrm{Sat}\big( \bm{u}_c[k - d_a] + \bm{a}_k \big),
+\quad t \in [kT_s + \tau_d,\ (k+1)T_s + \tau_d),
+\end{align}
+dengan $d_a$ kehilangan paket, $\tau_d$ tundaan total, dan $\bm{a}_k$ penyuntikan data palsu. Kuantisasi
+$Q$ dan kejenuhan $\mathrm{Sat}$ sudah ada; $\tau_{d,s}$, $d_a$, dan $\bm{a}_k$ belum.
+
+%=====================================================================
+\section{Lapisan Digital Twin}
+
+\model{Taksonomi Kritzinger}
+
+\begin{longtable}{l l l}
+\toprule
+\textbf{Tingkat} & \textbf{Aliran data} & \textbf{Posisi} \\
+\midrule
+\textbf{Digital Model} & tidak ada, manual & \textbf{di sini} \\
+Digital Shadow & otomatis, fisik $\rightarrow$ digital & belum \\
+Digital Twin & otomatis, dua arah & belum \\
+\bottomrule
+\end{longtable}
+
+Yang ada adalah Digital Model \emph{tervalidasi silang tiga jalur}: nilai eigen analitik, model Python dua
+sumbu, dan Gazebo saling cocok. Yang belum ada adalah hubungan ke alat fisik.
+
+\textbf{Jembatannya pendek.} Node \texttt{sensor\_node} menghasilkan data sensor dan menerbitkannya ke
+\texttt{/tracker/diag}; \texttt{ekf\_node} memakannya dari topik itu. Mengganti \texttt{sensor\_node} dengan
+node pembaca perangkat keras yang menerbitkan pesan sama membuat seluruh rantai di belakangnya berjalan
+tanpa perubahan.
+
+Usulan kerangka rujukan yang belum ada: identifikasi parameter $\bm{\theta}$ secara daring, optimasi
+multi-objektif prediktif
+$\max \sum_k [w_1 P_{\mathrm{gen}} - w_2 P_{\mathrm{act}} - w_3 D_{\mathrm{fatigue}}]$,
+indeks kesehatan dari hanyutan gesekan, dan deteksi \emph{backlash}. Dua usulan lain tidak berlaku:
+\emph{intelligent backtracking} ditujukan untuk ladang surya banyak panel (alat ini satu panel), dan
+\emph{predictive aero-elastic wind stow} tidak mendesak karena margin angin sebelas kali.
+
+\textbf{Catatan untuk pekerjaan lanjut.} Biaya kelelahan struktur
+$D_{\mathrm{fatigue}} = \lVert \bm{\tau}(k) - \bm{\tau}(k-1) \rVert^2$ memberi pembenaran kuantitatif bagi
+peredam ZVD, yang selama ini hanya dapat dibenarkan secara kualitatif karena rugi energinya $0{,}007\%$.
+
+%=====================================================================
+\section{Ringkasan Hasil Terukur}
+
+\begin{longtable}{p{6.4cm} p{4.6cm} p{4.0cm}}
+\toprule
+\textbf{Besaran} & \textbf{Nilai} & \textbf{Cara diperoleh} \\
+\midrule
+\endhead
+Posisi matahari & selisih $< 0{,}011\degg$ & SPA vs astropy, SolTrack, Pysolar \\
+Kinematika normal panel & selisih $0{,}14$--$0{,}34\degg$ & Gazebo TF vs Pers.~\eqref{eq:fk} \\
+Defleksi gravitasi $q_2 = 0$ & $0{,}161\degg$ vs $0{,}155\degg$ & Gazebo vs Pers.~\eqref{eq:grav} \\
+Frekuensi alami azimuth & $4{,}79$ prediksi, $5{,}19$ terukur Hz & nilai eigen vs Gazebo 1 kHz \\
+Lewatan langkah $1\degg$ & $93{,}3\%$ teori, $90\%$ terukur & analitik vs Gazebo \\
+ZVD menekan lewatan terburuk & $19{,}35\degg \rightarrow 2{,}30\degg$ & Gazebo, lima ulangan \\
+Rugi energi dari osilasi & $0{,}007\%$ & model dua sumbu 1 kHz \\
+Energi harian 7 Okt & $431{,}0$ Wh vs $362{,}3$ Wh datar & model dioda tunggal \\
+Margin angin terburuk 11 tahun & $9{,}2\%$ torsi tahan & Open-Meteo + Pers.~\eqref{eq:wind} \\
+EKF dengan LDR terkalibrasi & $2{,}52\degg \rightarrow 0{,}18\degg$ & simulasi hari penuh \\
+Pemulihan lepas langkah $7{,}2\degg$ & $350$ detik & simulasi hari penuh \\
+\bottomrule
+\end{longtable}
+
+%=====================================================================
+\section{Kekurangan dan Parameter yang Masih Diasumsikan}
+\label{sec:asumsi}
+
+\textbf{Belum dimodelkan:} suku Coriolis (besarnya sudah dihitung, $3{,}4\%$ saat slew), latensi dan jitter
+jaringan, serangan siber, \emph{event-triggered control}, optimasi multi-objektif, \emph{backlash} kopling,
+dan mode getar rangka.
+
+\textbf{Asumsi yang paling menentukan:}
+
+\begin{longtable}{p{5.4cm} p{3.0cm} p{6.4cm}}
+\toprule
+\textbf{Parameter} & \textbf{Nilai} & \textbf{Cara mengukur} \\
+\midrule
+\endhead
+Redaman sendi $b$ & $0{,}2$ N\,m\,s/rad & \textbf{uji peluruhan bebas} \\
+Gesekan Coulomb $\tau_c$ & $0{,}05$ N\,m & torsi minimum penggerak \\
+Kekakuan poros $k$ & $317$ dan $1600$ N\,m/rad & uji peluruhan bebas \\
+Eksponen LDR $\gamma$ & $0{,}7$ & kurva lux-tegangan di meja \\
+Setengah jenuh $L_0$ & $20000$ lux & kurva yang sama \\
+Ketidakcocokan LDR & $3\%$ & prosedur A saat mendung \\
+Batas kemiringan & $45\degg$ & gerakkan sampai menumbuk \\
+Arah hadap rel $\psi$ & $90\degg$ & kompas \\
+Massa motor & $1{,}2$ kg & timbang atau lembar data \\
+Koefisien angin $C_n$ & $1{,}2$ & tabel beban angin atau CFD \\
+Pusat tekanan $e_c$, $e_s$ & $0{,}0668$, $0{,}02$ m & aerodinamika pelat datar \\
+\bottomrule
+\end{longtable}
+
+\textbf{Uji peluruhan bebas} adalah percobaan tunggal paling bernilai: dari satu rekaman langkah dapat
+diperoleh $\omega_n$ (dari frekuensi ayunan), $\zeta$ lalu $b$ (dari rasio puncak berurutan melalui
+$\zeta = -\ln(\text{rasio})/2\pi$), dan $\tau_c$ (dari simpangan sisa yang tidak kembali ke nol).
+
+\textbf{Dua klaim yang ditarik dalam pengerjaan:} batas angin tarik-lepas $9{,}6$~m/s (lengan momen tebakan;
+rentang sebenarnya $6{,}5$ sampai $39$~m/s) dan pergeseran puncak arus $+2{,}6\degg$ (irradiance pilihan
+tangan tidak konsisten dengan $G_h = I_b\sin e + I_d$).
+
+%=====================================================================
+\begin{thebibliography}{99}
+\small
+\bibitem{spa} I. Reda dan A. Andreas, \emph{Solar Position Algorithm for Solar Radiation Applications},
+NREL/TP-560-34302. Dipakai lewat \texttt{pvlib}.
+\bibitem{ineichen} P. Ineichen dan R. Perez, \emph{A new airmass independent formulation for the Linke
+turbidity coefficient}, Solar Energy, 2002.
+\bibitem{kasten} F. Kasten dan G. Czeplak, \emph{Solar and terrestrial radiation dependent on the amount and
+type of cloud}, Solar Energy, 1980.
+\bibitem{erbs} D. G. Erbs, S. A. Klein, dan J. A. Duffie, \emph{Estimation of the diffuse radiation fraction},
+Solar Energy, 1982.
+\bibitem{liu} B. Y. H. Liu dan R. C. Jordan, model transposisi isotropik untuk irradiance bidang miring.
+\bibitem{ashrae} ASHRAE, model \emph{incidence angle modifier}; lihat juga Souka dan Safwat.
+\bibitem{desoto} W. De Soto, S. A. Klein, dan W. A. Beckman, \emph{Improvement and validation of a model for
+photovoltaic array performance}, Solar Energy, 2006.
+\bibitem{singer} N. C. Singer dan W. P. Seering, \emph{Preshaping command inputs to reduce system vibration},
+ASME J. Dynamic Systems, Measurement and Control, 1990.
+\bibitem{spong} M. W. Spong, S. Hutchinson, dan M. Vidyasagar, \emph{Robot Modeling and Control}
+(persamaan manipulator dan simbol Christoffel).
+\bibitem{barshalom} Y. Bar-Shalom, X. R. Li, dan T. Kirubarajan, \emph{Estimation with Applications to
+Tracking and Navigation} (EKF, bentuk Joseph, uji NIS).
+\bibitem{kritzinger} W. Kritzinger dkk., \emph{Digital Twin in manufacturing: A categorical literature
+review and classification}, IFAC-PapersOnLine, 2018.
+\bibitem{openmeteo} Open-Meteo Historical Weather API, reanalisis ERA5 per jam.
+\end{thebibliography}
+
+\end{document}

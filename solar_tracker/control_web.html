@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Panel Kontrol Solar Tracker</title>
+<style>
+:root{--bg:#14171c;--card:#1d222a;--line:#2d3440;--tx:#e8ecf2;--mut:#8b95a5;--acc:#f5b400;--ok:#36c26e;--warn:#f08c00;--bad:#ff4d4f}
+@media (prefers-color-scheme:light){:root{--bg:#f2f4f7;--card:#fff;--line:#d5dae2;--tx:#1b2330;--mut:#667085}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 "Segoe UI",system-ui,sans-serif}
+header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+h1{font-size:20px;margin:0}header span{color:var(--mut);font-size:14px}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px;padding:14px 20px;max-width:1500px;margin:auto}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+h2{margin:0 0 10px;font-size:15px;color:var(--acc);letter-spacing:.04em;text-transform:uppercase}
+.row{display:grid;grid-template-columns:200px 1fr 90px;gap:10px;align-items:center;margin:8px 0}
+.row label{color:var(--mut);font-size:14px}.row output{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+input[type=range]{width:100%;accent-color:var(--acc)}
+select,button{font:inherit;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--acc)}.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg label{display:flex;gap:6px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.seg input:checked+span{color:var(--acc);font-weight:700}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:6px 10px;font-size:17px}.kv div:nth-child(odd){color:var(--mut);font-size:14px;align-self:center}
+.mono{font-family:Consolas,monospace;font-variant-numeric:tabular-nums}
+#err{font-size:34px;font-weight:700}.note{color:var(--mut);font-size:13px;margin-top:6px}
+.badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:700}
+.dis{opacity:.4;pointer-events:none}
+</style></head><body>
+<header><h1>Panel Kontrol Solar Tracker</h1><span>PENS Surabaya, -7.276, 112.794 | pvlib + stepper loop terbuka</span><span id="conn" class="badge" style="background:var(--bad);color:#fff">terputus</span></header>
+<main>
+<section><h2>1. Mode</h2>
+<div class="seg">
+<label><input type="radio" name="mode" value="auto" checked><span>Otomatis: ikuti matahari</span></label>
+<label><input type="radio" name="mode" value="manual"><span>Manual: geser sendi sendiri</span></label></div>
+<div class="note">Mode manual: matahari tetap ditampilkan, panel tidak lagi mengikutinya, galat pointing menunjukkan seberapa jauh Anda dari matahari.</div></section>
+
+<section><h2>2. Matahari dan waktu</h2>
+<div class="row"><label>Tanggal (hari ke- 2026)</label><input id="doy" type="range" min="1" max="365" step="1"><output id="doy_o"></output></div>
+<div class="row"><label>Jam lokal (WIB)</label><input id="hour" type="range" min="5" max="19" step="0.05"><output id="hour_o"></output></div>
+<div class="row"><label>Waktu jalan otomatis</label><label style="color:var(--tx)"><input id="run" type="checkbox"> jalan</label>
+<select id="speed"><option>1</option><option>60</option><option>300</option><option selected>600</option><option>1200</option></select></div>
+<div class="row"><label>Tutupan awan (okta 0..8)</label><input id="okta" type="range" min="0" max="8" step="1" value="0"><output id="okta_o">0</output></div>
+<div class="note">Menggeser jam membekukan waktu. Kecepatan = detik simulasi per detik nyata.</div></section>
+
+<section id="manual"><h2>3. Sendi manual</h2>
+<div class="row"><label>Azimuth q1 (deg, CW; arah miring = q1 + 90 dari Utara)</label><input id="q1" type="range" min="-200" max="200" step="0.5" value="0"><output id="q1_o">0</output></div>
+<div class="row"><label>Kemiringan q2 (deg, 0 = datar)</label><input id="q2" type="range" min="-45" max="45" step="0.5" value="0"><output id="q2_o">0</output></div>
+<button id="zero">Nol (datar, azimuth 0)</button></section>
+
+<section><h2>4. Stepper dan gangguan</h2>
+<div class="row"><label>Microstep 1/N</label><select id="microstep"><option>1</option><option>2</option><option>4</option><option>8</option><option selected>16</option><option>32</option></select><span></span></div>
+<div class="row"><label>Angin: pengali data nyata</label><input id="skala" type="range" min="0" max="4" step="0.1" value="1"><output id="skala_o">1.0 x</output></div>
+<div class="row"><label>Kekasaran medan (alpha)</label><select id="alpha"><option value="0.16">0.16 lapangan terbuka</option><option value="0.25">0.25 pinggiran</option><option value="0.30" selected>0.30 kampus sedang</option><option value="0.35">0.35 kampus rapat</option></select>
+<label style="color:var(--tx)"><input id="hembus" type="checkbox"> pakai hembusan</label></div>
+<div class="note" style="margin:2px 0 0">Angin NYATA Open-Meteo 11 tahun. Preset karangan (tenang, berangin, badai) sudah dibuang: maksimum tahunan Surabaya stabil, jadi data nyata sudah mencakup rentang penuh. Pengali 3x memberi sekitar 83 persen torsi tahan.</div>
+<div class="row"><label>Torsi tambahan azimuth (N.m)</label><input id="xaz" type="range" min="-5" max="5" step="0.1" value="0"><output id="xaz_o">0.0</output></div>
+<div class="row"><label>Torsi tambahan elevasi (N.m)</label><input id="xel" type="range" min="-5" max="5" step="0.1" value="0"><output id="xel_o">0.0</output></div>
+<div class="note">Torsi tahan stepper 3 N.m: melewati itu, motor lepas langkah (penanda merah di bawah).</div>
+<button id="reset" style="margin-top:8px">Reset gangguan dan penanda lepas langkah</button></section>
+
+<section style="grid-column:1/-1"><h2>5. Pembacaan langsung</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px">
+<div class="kv mono"><div>Waktu</div><div id="r_t">-</div><div>Matahari</div><div id="r_sun">-</div><div>Irradiance</div><div id="r_irr">-</div><div>Perintah sendi</div><div id="r_cmd">-</div><div>Sudut beban</div><div id="r_load">-</div></div>
+<div><div class="note" style="margin:0">Galat pointing (sudut antara normal panel dan matahari)</div><div id="err" class="mono">-</div>
+<div class="kv mono" style="margin-top:8px"><div>Stepper</div><div id="r_stp">-</div><div>Angin</div><div id="r_wind">-</div></div></div></div></section>
+<section style="grid-column:1/-1"><h2>6. Energi pada posisi panel saat ini</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px">
+<div class="kv mono"><div>Irradiance bidang</div><div id="e_poa">-</div><div>Cos sudut datang</div><div id="e_cth">-</div><div>Daya panel (sekarang)</div><div id="e_p">-</div><div>Panel datar (acuan)</div><div id="e_pf">-</div><div>Tracker ideal (batas atas)</div><div id="e_pi">-</div></div>
+<div class="kv mono"><div>Energi hari ini</div><div id="e_e">-</div><div>Panel datar hari ini</div><div id="e_ef">-</div><div>Tracker ideal hari ini</div><div id="e_ei">-</div><div>Keuntungan vs datar</div><div id="e_gain">-</div>
+<div></div><div><button id="e_reset">Reset energi</button> <a href="/energi.csv" download="energi_tracker.csv"><button>Unduh CSV</button></a></div></div></div>
+<div class="note">Daya = irradiance bidang x luas panel 0.44 x 0.30 m (default) x efisiensi modul 18% (ASUMSI), dihitung dari sudut BEBAN (posisi nyata panel, termasuk lepas langkah). Model isotropik seperti sun.poa. Energi terintegrasi terhadap jam simulasi hanya saat waktu berjalan.</div></section>
+<section style="grid-column:1/-1" id="diag_sec"><h2>7. Sensor dan diagnostik (sensor_node)</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px">
+<div><div class="note" style="margin:0 0 6px">Empat LDR (tegangan ADC) pada sudut BEBAN</div>
+<div id="ldr_bars" style="display:grid;grid-template-columns:40px 1fr 70px;gap:4px 8px;align-items:center;font-size:13px"></div>
+<div class="kv mono" style="margin-top:8px"><div>Selisih ex (sumbu x)</div><div id="d_ex">-</div><div>Selisih ey (sumbu y)</div><div id="d_ey">-</div></div></div>
+<div><div class="note" style="margin:0 0 6px">Listrik panel (dioda tunggal, MOS C-50-18-M)</div>
+<div class="kv mono"><div>Irradiance bidang</div><div id="d_poa">-</div><div>Suhu sel</div><div id="d_tc">-</div><div>Arus hubung singkat</div><div id="d_isc">-</div><div>Titik daya maks</div><div id="d_mpp">-</div><div>Daya</div><div id="d_pmp">-</div></div></div>
+<div><div class="note" style="margin:0 0 6px">Uraian galat pointing</div>
+<div class="kv mono"><div>Galat perintah</div><div id="d_gc">-</div><div>Galat beban</div><div id="d_gb">-</div><div>Selisih dinamik</div><div id="d_gd">-</div><div>Simpangan sendi</div><div id="d_ds">-</div><div>Matahari terjangkau</div><div id="d_rj">-</div></div></div>
+<div><div class="note" style="margin:0 0 6px">Energi hari ini (dari model dioda)</div>
+<div class="kv mono"><div>Tracker</div><div id="d_wh">-</div><div>Panel datar</div><div id="d_whf">-</div><div>Tracker ideal</div><div id="d_whi">-</div><div>Keuntungan</div><div id="d_gain">-</div></div></div>
+<div><div class="note" style="margin:0 0 6px">Ayunan sudut beban (diukur pada laju penuh /joint_states)</div>
+<div class="kv mono"><div>Azimuth puncak-puncak</div><div id="o_azpp">-</div><div>Azimuth rms, frekuensi</div><div id="o_az">-</div><div>Kemiringan puncak-puncak</div><div id="o_elpp">-</div><div>Kemiringan rms, frekuensi</div><div id="o_el">-</div><div>Laju cuplik terpakai</div><div id="o_hz">-</div></div></div>
+</div>
+<div class="note">Galat perintah = batas jangkauan 45 derajat dan ketertinggalan perintah. Galat beban menambah defleksi gravitasi, ayunan, dan lepas langkah. Selisihnya adalah galat dinamik. Ketidakcocokan antar LDR diatur lewat argumen launch <code>mism</code> dan <code>kalibrasi</code>.</div></section>
+<section style="grid-column:1/-1" id="ekf_sec"><h2>8. Penaksir simpangan sudut (ekf_node)</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px">
+<div class="kv mono"><div>Taksiran simpangan</div><div id="k_b">-</div><div>Ketidakpastian (1 sigma)</div><div id="k_s">-</div><div>Simpangan sebenarnya</div><div id="k_true">-</div><div>Galat taksiran</div><div id="k_err">-</div></div>
+<div class="kv mono"><div>Inovasi (ex, ey)</div><div id="k_in">-</div><div>Inovasi ternormalkan</div><div id="k_nis">-</div><div>Pengukuran dipakai</div><div id="k_use">-</div><div>Azimuth teramati</div><div id="k_obs">-</div></div>
+<div class="kv mono"><div>Kepekaan k azimuth</div><div id="k_kaz">-</div><div>Kepekaan k kemiringan</div><div id="k_kq2">-</div></div>
+</div>
+<div class="note">Perhatikan ketidakpastian azimuth MEMBESAR SENDIRI saat matahari tinggi, karena kepekaan k azimuth sebanding sin(q2). Efek keyhole muncul sebagai angka, bukan aturan tangan. Jalankan dengan <code>ekf:=true</code>; tambahkan <code>pakai_ekf:=true</code> agar koreksinya benar benar dipakai (loop tertutup).</div></section>
+
+<section style="grid-column:1/-1"><h2>9. Grafik waktu</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px">
+<div><div class="note" style="margin:0 0 6px">Galat pointing (deg)</div><canvas id="g1" width="520" height="180" style="width:100%;background:#15181d;border-radius:6px"></canvas>
+<div class="note" id="g1l" style="margin:4px 0 0"></div></div>
+<div><div class="note" style="margin:0 0 6px">EKF: ketidakpastian dan galat taksiran (deg)</div><canvas id="g2" width="520" height="180" style="width:100%;background:#15181d;border-radius:6px"></canvas>
+<div class="note" id="g2l" style="margin:4px 0 0"></div></div>
+<div><div class="note" style="margin:0 0 6px">Daya panel dan irradiance bidang</div><canvas id="g3" width="520" height="180" style="width:100%;background:#15181d;border-radius:6px"></canvas>
+<div class="note" id="g3l" style="margin:4px 0 0"></div></div>
+<div><div class="note" style="margin:0 0 6px">Ayunan puncak ke puncak (deg)</div><canvas id="g4" width="520" height="180" style="width:100%;background:#15181d;border-radius:6px"></canvas>
+<div class="note" id="g4l" style="margin:4px 0 0"></div></div>
+</div>
+<div class="note">Tiap panel punya skala sendiri: menggabungkan galat 100 derajat dengan sigma 0.1 derajat membuat sigma tidak terlihat.</div>
+<div class="note">Sumbu datar = jam simulasi. Riwayat disimpan di browser dan terhapus bila halaman dimuat ulang. <button id="g_reset">Kosongkan grafik</button></div></section>
+<section style="grid-column:1/-1"><h2>10. Angin (data nyata Open-Meteo)</h2>
+<div style="display:grid;grid-template-columns:220px repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start">
+<div style="text-align:center">
+<svg id="w_kompas" width="200" height="200" viewBox="0 0 200 200">
+  <circle cx="100" cy="100" r="86" fill="#15181d" stroke="#2b3038" stroke-width="2"/>
+  <circle cx="100" cy="100" r="60" fill="none" stroke="#22262d" stroke-width="1"/>
+  <line x1="100" y1="14" x2="100" y2="186" stroke="#22262d"/><line x1="14" y1="100" x2="186" y2="100" stroke="#22262d"/>
+  <text x="100" y="28" text-anchor="middle" fill="#9aa4b2" font-size="13" font-family="monospace">U</text>
+  <text x="178" y="105" text-anchor="middle" fill="#9aa4b2" font-size="13" font-family="monospace">T</text>
+  <text x="100" y="184" text-anchor="middle" fill="#9aa4b2" font-size="13" font-family="monospace">S</text>
+  <text x="22" y="105" text-anchor="middle" fill="#9aa4b2" font-size="13" font-family="monospace">B</text>
+  <g id="w_panah" transform="rotate(0 100 100)">
+    <line x1="100" y1="100" x2="100" y2="32" stroke="#38bdf8" stroke-width="5" stroke-linecap="round"/>
+    <polygon points="100,20 91,38 109,38" fill="#38bdf8"/>
+    <circle cx="100" cy="100" r="7" fill="#1f6feb"/>
+    <line x1="100" y1="100" x2="100" y2="150" stroke="#1f6feb" stroke-width="3" stroke-dasharray="5 4"/>
+    <circle cx="100" cy="158" r="5" fill="none" stroke="#1f6feb" stroke-width="2"/>
+  </g>
+</svg>
+<div class="note" style="margin:4px 0 0">Lingkaran kecil = asal angin, panah = arah tiupan</div></div>
+<div class="kv mono"><div>Angin DATANG dari</div><div id="w_dari">-</div><div>BERTIUP menuju</div><div id="w_menuju">-</div>
+<div>Kecepatan di 10 m</div><div id="w_v10">-</div><div>Kecepatan di panel</div><div id="w_vp">-</div>
+<div>Hembusan di panel</div><div id="w_hp">-</div></div>
+<div class="kv mono"><div>Torsi azimuth</div><div id="w_taz">-</div><div>Torsi kemiringan</div><div id="w_tel">-</div>
+<div>Pergeseran perintah</div><div id="w_geser">-</div><div>Terhadap torsi tahan</div><div id="w_marg">-</div></div>
+</div>
+<div class="note">Data per jam dari reanalisis Open-Meteo pada ketinggian 10 m, dikoreksi ke tinggi panel 0,3 m dengan profil pangkat (alpha 0,30, ASUMSI). Torsi bergantung arah angin DAN orientasi panel: torsi azimuth NOL saat panel datar, karena gaya tegak lurus panel datar tidak dapat memuntir sumbu tegak. Ganti hari dengan <code>ros2 param set /wind_node tanggal 2026-01-15</code>, atau pakai nilai hembusan dengan <code>pakai_hembusan true</code>.</div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);let drag={},last={};
+const post=(name,value)=>fetch('/set',{method:'POST',body:JSON.stringify({name,value})}).catch(()=>{});
+const thr={};function send(name,value,ms=120){const t=Date.now();if(!thr[name]||t-thr[name]>ms){thr[name]=t;post(name,value)}}
+function bindRange(id,name,fmt,live=true){const e=$(id),o=$(id+'_o');e.addEventListener('input',()=>{drag[id]=1;o.textContent=fmt(e.value);if(live)send(name,+e.value)});
+ e.addEventListener('change',()=>{post(name,+e.value);setTimeout(()=>delete drag[id],400)});}
+bindRange('doy','doy',v=>v+' ('+new Date(Date.UTC(2026,0,+v)).toISOString().slice(0,10)+')',false);
+$('doy').addEventListener('change',()=>{});
+bindRange('hour','hour',v=>(+v).toFixed(2));bindRange('okta','okta',v=>v,false);
+bindRange('q1','q1',v=>(+v).toFixed(1));bindRange('q2','q2',v=>(+v).toFixed(1));
+bindRange('xaz','xaz',v=>(+v).toFixed(1),false);bindRange('xel','xel',v=>(+v).toFixed(1),false);
+document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener('change',()=>post('mode',r.value)));
+$('run').addEventListener('change',()=>post('run',$('run').checked));
+$('speed').addEventListener('change',()=>post('speed',+$('speed').value));
+$('microstep').addEventListener('change',()=>post('microstep',+$('microstep').value));
+$('skala').addEventListener('input',()=>{$('skala_o').textContent=(+$('skala').value).toFixed(1)+' x';post('skala',+$('skala').value)});
+$('alpha').addEventListener('change',()=>post('alpha',+$('alpha').value));
+$('hembus').addEventListener('change',()=>post('hembus',$('hembus').checked));
+$('e_reset').addEventListener('click',()=>post('reset_energi'));
+$('zero').addEventListener('click',()=>post('zero'));
+$('reset').addEventListener('click',()=>{post('reset');$('xaz').value=0;$('xel').value=0;$('xaz_o').textContent='0.0';$('xel_o').textContent='0.0'});
+const f=(x,d=1)=>(+x).toFixed(d);
+async function tick(){
+ try{const s=await (await fetch('/state')).json();$('conn').textContent='terhubung';$('conn').style.background='var(--ok)';
+  document.querySelector('input[name=mode][value='+s.mode+']').checked=true;
+  $('manual').classList.toggle('dis',s.mode!=='manual');
+  if(!drag.doy){$('doy').value=s.doy;$('doy_o').textContent=s.doy+' ('+s.date+')'}
+  if(!drag.hour){$('hour').value=s.hour;$('hour_o').textContent=f(s.hour,2)}
+  $('run').checked=s.run;
+  if(!drag.q1&&s.mode==='manual'){$('q1').value=s.q1;$('q1_o').textContent=f(s.q1)}
+  if(!drag.q2&&s.mode==='manual'){$('q2').value=s.q2;$('q2_o').textContent=f(s.q2)}
+  if(s.ok_sun){$('r_t').textContent=s.date+'  '+s.jam+' WIB';$('r_sun').textContent='az '+f(s.az)+'  el '+f(s.el)+' deg';
+   $('r_irr').textContent='DNI '+f(s.dni,0)+'  GHI '+f(s.ghi,0)+'  DHI '+f(s.dhi,0)+' W/m2';$('r_cmd').textContent='q1 '+f(s.cmd_q1)+'  q2 '+f(s.cmd_q2)+' deg';
+   const e=$('err');e.textContent=f(s.err,2)+' deg'+(s.el<=0?'  (matahari di bawah horizon)':'');e.style.color=s.err<.6?'var(--ok)':s.err<3?'var(--warn)':'var(--bad)'}
+  else $('r_t').textContent='menunggu node matahari (sun_node:=true)';
+  if(s.poa!==undefined){$('e_poa').textContent=f(s.poa,0)+' W/m2';$('e_cth').textContent=f(s.cth,3);$('e_p').textContent=f(s.p_w,1)+' W';$('e_pf').textContent=f(s.flat_w,1)+' W';$('e_pi').textContent=f(s.ideal_w,1)+' W';
+   $('e_e').textContent=f(s.e_wh,1)+' Wh';$('e_ef').textContent=f(s.e_flat,1)+' Wh';$('e_ei').textContent=f(s.e_ideal,1)+' Wh';$('e_gain').textContent=s.e_flat>1?'+'+f((s.e_wh/s.e_flat-1)*100,1)+' %':'-'}
+  if(s.w_dari!==undefined){
+   $('w_panah').setAttribute('transform','rotate('+s.w_menuju.toFixed(1)+' 100 100)');
+   $('w_dari').textContent=f(s.w_dari,0)+' deg ('+s.w_dari_nama+')';
+   $('w_menuju').textContent=f(s.w_menuju,0)+' deg ('+s.w_menuju_nama+')';
+   $('w_v10').textContent=f(s.w_v10,2)+' m/s  (hembusan '+f(s.w_hembusan10,2)+')';
+   $('w_vp').textContent=f(s.wind_v,2)+' m/s';
+   $('w_hp').textContent=f(s.w_hembusan,2)+' m/s';
+   $('w_taz').textContent=f(s.tau_az,4)+' N.m';$('w_tel').textContent=f(s.tau_el,4)+' N.m';
+   $('w_geser').textContent='az '+f(s.wd_az,4)+'  el '+f(s.wd_el,4)+' deg';
+   const mx=Math.max(Math.abs(s.tau_az),Math.abs(s.tau_el))/3*100;
+   $('w_marg').innerHTML=f(mx,2)+' % <span class="badge" style="background:'+(mx>50?'var(--bad)':'var(--ok)')+';color:#fff">'+(mx>50?'mendekati lepas langkah':'aman')+'</span>'}
+  if(s.ekf){const k=s.ekf,dq=s.diag?s.diag.sendi:null;
+   $('k_b').textContent='az '+f(k.b_az,3)+'  q2 '+f(k.b_q2,3)+' deg';
+   $('k_s').textContent='az '+f(k.sig_az,3)+'  q2 '+f(k.sig_q2,3)+' deg';
+   if(dq){$('k_true').textContent='az '+f(dq.d_q1,3)+'  q2 '+f(dq.d_q2,3)+' deg';
+     $('k_err').textContent='az '+f(k.b_az-dq.d_q1,3)+'  q2 '+f(k.b_q2-dq.d_q2,3)+' deg'}
+   $('k_in').textContent=f(k.inov_ex,5)+', '+f(k.inov_ey,5);$('k_nis').textContent=f(k.nis,2);
+   $('k_use').innerHTML=k.dipakai?'<span class="badge" style="background:var(--ok);color:#fff">ya</span>':
+     (k.terjangkau===false?'<span class="badge" style="background:var(--mut);color:#fff">dilewati (di luar jangkauan)</span>':
+      '<span class="badge" style="background:var(--bad);color:#fff">ditolak (pencilan, NIS '+f(k.nis,0)+')</span>');
+   $('k_obs').innerHTML=k.teramati_az?'<span class="badge" style="background:var(--ok);color:#fff">ya</span>':'<span class="badge" style="background:var(--bad);color:#fff">lemah (k azimuth kecil)</span>';
+   $('k_kaz').textContent=f(k.k_az,6)+' per deg';$('k_kq2').textContent=f(k.k_q2,6)+' per deg'}
+  if(s.diag){const g=s.diag,L=['x+','x-','y+','y-'],vm=Math.max(...g.ldr.v,0.01);
+   HIST.push({h:g.jam,gb:g.galat.beban,gc:g.galat.perintah,sig:s.ekf?s.ekf.sig_az:null,opp:g.osilasi?g.osilasi.az.pp:null,epp:g.osilasi?g.osilasi.el.pp:null,
+              kerr:s.ekf?s.ekf.b_az-g.sendi.d_q1:null,pmp:g.listrik.pmp,poa:g.listrik.poa});
+   if(HIST.length>1 && HIST[HIST.length-1].h < HIST[HIST.length-2].h-0.5) HIST.splice(0,HIST.length-1);
+   if(HIST.length>3000) HIST.splice(0,HIST.length-3000); gambar();
+   $('ldr_bars').innerHTML=L.map((nm,i)=>`<div>${nm}</div><div style="background:#2b3038;border-radius:3px;height:14px"><div style="width:${(g.ldr.v[i]/vm*100).toFixed(1)}%;background:var(--ok);height:100%;border-radius:3px"></div></div><div class="mono">${g.ldr.v[i].toFixed(3)} V</div>`).join('');
+   $('d_ex').textContent=f(g.ldr.ex,5);$('d_ey').textContent=f(g.ldr.ey,5);
+   $('d_poa').textContent=f(g.listrik.poa,0)+' W/m2';$('d_tc').textContent=f(g.listrik.tcell,1)+' C';
+   $('d_isc').textContent=f(g.listrik.isc,3)+' A';$('d_mpp').textContent=f(g.listrik.imp,3)+' A @ '+f(g.listrik.vmp,2)+' V';
+   $('d_pmp').textContent=f(g.listrik.pmp,2)+' W';
+   $('d_gc').textContent=f(g.galat.perintah,3)+' deg';$('d_gb').textContent=f(g.galat.beban,3)+' deg';
+   $('d_gd').textContent=f(g.galat.dinamik,3)+' deg';
+   $('d_ds').textContent='q1 '+f(g.sendi.d_q1,3)+'  q2 '+f(g.sendi.d_q2,3)+' deg';
+   $('d_rj').innerHTML=g.galat.terjangkau?'<span class="badge" style="background:var(--ok);color:#fff">ya</span>':'<span class="badge" style="background:var(--bad);color:#fff">tidak (zenith > 45)</span>';
+   $('d_wh').textContent=f(g.energi.wh,1)+' Wh';$('d_whf').textContent=f(g.energi.wh_datar,1)+' Wh';
+   $('d_whi').textContent=f(g.energi.wh_ideal,1)+' Wh';$('d_gain').textContent=f(g.energi.gain_pct,1)+' %';
+   if(g.osilasi){const o=g.osilasi;
+     $('o_azpp').textContent=f(o.az.pp,4)+' deg';$('o_az').textContent=f(o.az.rms,4)+' deg, '+f(o.az.f,2)+' Hz';
+     $('o_elpp').textContent=f(o.el.pp,4)+' deg';$('o_el').textContent=f(o.el.rms,4)+' deg, '+f(o.el.f,2)+' Hz';
+     $('o_hz').innerHTML=f(o.hz,0)+' Hz ('+o.n+' cuplikan)'+(o.hz<30?' <span class="badge" style="background:var(--bad);color:#fff">terlalu lambat untuk dering 5 sampai 7 Hz</span>':'')}}
+  $('r_load').textContent='q1 '+f(s.load_q1)+'  q2 '+f(s.load_q2)+' deg';
+  if(s.ok_stepper){$('r_stp').innerHTML='selisih az '+f(s.d_az,2)+'  el '+f(s.d_el,2)+' deg '+(s.slipped?'<span class="badge" style="background:var(--bad);color:#fff">LEPAS LANGKAH</span>':'<span class="badge" style="background:var(--ok);color:#fff">normal</span>');$('r_wind').textContent=f(s.wind_v)+' m/s'}
+  else if(s.ok_wind){$('r_stp').textContent='mode pid, angin menggeser az '+f(s.wd_az,3)+'  el '+f(s.wd_el,3)+' deg (torsi '+f(s.tau_az,2)+' / '+f(s.tau_el,2)+' N.m)';$('r_wind').textContent=f(s.wind_v)+' m/s'}
+  else{$('r_stp').textContent='tidak aktif';$('r_wind').textContent='-'}
+ }catch(e){$('conn').textContent='terputus';$('conn').style.background='var(--bad)'}
+}
+const HIST=[];
+$('g_reset').addEventListener('click',()=>{HIST.length=0;gambar()});
+function garis(ctx,W,Hh,pts,xs,lo,hi,warna){
+  if(pts.length<2)return; ctx.strokeStyle=warna; ctx.lineWidth=1.5; ctx.beginPath(); let mulai=true;
+  for(let i=0;i<pts.length;i++){ const y=pts[i]; if(y===null||y===undefined||!isFinite(y)){mulai=true;continue}
+    const X=28+(xs[i]-xs[0])/(xs[xs.length-1]-xs[0]||1)*(W-36), Y=Hh-18-(y-lo)/((hi-lo)||1)*(Hh-30);
+    if(mulai){ctx.moveTo(X,Y);mulai=false}else ctx.lineTo(X,Y)}
+  ctx.stroke()}
+function panel(id,lid,seri,satuan){
+  const c=document.getElementById(id),ctx=c.getContext('2d'),W=c.width,Hh=c.height;
+  ctx.clearRect(0,0,W,Hh);
+  if(HIST.length<2){ctx.fillStyle='#6b7280';ctx.font='12px monospace';ctx.fillText('menunggu data...',32,Hh/2);document.getElementById(lid).textContent='';return}
+  const xs=HIST.map(r=>r.h); let semua=[];
+  seri.forEach(s=>HIST.forEach(r=>{const v=r[s.k];if(v!==null&&v!==undefined&&isFinite(v))semua.push(v)}));
+  if(!semua.length)return; let lo=Math.min(...semua),hi=Math.max(...semua); if(hi-lo<1e-9){hi=lo+1;lo-=1}
+  const m=(hi-lo)*0.08; lo-=m; hi+=m;
+  ctx.strokeStyle='#2b3038';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(28,Hh-18);ctx.lineTo(W-8,Hh-18);ctx.moveTo(28,8);ctx.lineTo(28,Hh-18);ctx.stroke();
+  ctx.fillStyle='#6b7280';ctx.font='10px monospace';
+  ctx.fillText(hi.toFixed(2),2,14); ctx.fillText(lo.toFixed(2),2,Hh-20);
+  ctx.fillText(xs[0].toFixed(1)+' j',28,Hh-6); ctx.fillText(xs[xs.length-1].toFixed(1)+' j',W-44,Hh-6);
+  seri.forEach(s=>garis(ctx,W,Hh,HIST.map(r=>r[s.k]),xs,lo,hi,s.c));
+  document.getElementById(lid).innerHTML=seri.map(s=>`<span style="color:${s.c}">&#9632;</span> ${s.n}`).join(' &nbsp; ')+' &nbsp; ('+satuan+')';}
+function gambar(){
+  panel('g1','g1l',[{k:'gb',c:'#f87171',n:'galat beban'},{k:'gc',c:'#60a5fa',n:'galat perintah'}],'deg');
+  panel('g2','g2l',[{k:'sig',c:'#fbbf24',n:'sigma az'},{k:'kerr',c:'#f472b6',n:'galat taksiran az'}],'deg');
+  panel('g3','g3l',[{k:'pmp',c:'#34d399',n:'daya Pmp (W)'},{k:'poa',c:'#a78bfa',n:'POA (W/m2)'}],'skala bersama');
+  panel('g4','g4l',[{k:'opp',c:'#fb923c',n:'ayunan az pp'},{k:'epp',c:'#22d3ee',n:'ayunan el pp'}],'deg');}
+setInterval(tick,200);tick();
+</script></body></html>

@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<!-- Dunia Gazebo varian aktuator stepper: sendi digerakkan torsi dari stepper_node.py (ApplyJointForce), bukan kontrol posisi demo.
+     Jalankan lewat launch: ros2 launch ~/mk/solar_tracker/launch/sim.launch.py actuator:=stepper -->
+<sdf version="1.9">
+  <world name="solar_world">
+    <gravity>0 0 -10</gravity>   <!-- KEPUTUSAN pengguna: 10 m/s2, bukan 9.80665 bawaan; sama dengan G di inersia/inersia_cad.py -->
+    <physics name="1ms" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <direction>-0.4 0.2 -0.9</direction>
+    </light>
+
+    <scene>
+      <ambient>0.50 0.50 0.50 1</ambient>
+      <background>0.56 0.74 0.93 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <!-- Lingkungan (visual saja). Frame dunia = frame dasar tracker: +x = Utara, +y = Barat, +z = atas.
+         Penanda kompas pada jarak 3.2 m: Utara = kerucut merah menunjuk +x, Timur = kotak hijau (-y), Selatan = kotak putih (-x), Barat = kotak kuning (+y).
+         Garis abu-abu = sumbu Utara-Selatan (x) dan Timur-Barat (y). Bola kuning = posisi matahari (diperbarui sun_command_node). -->
+    <model name="ground">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry>
+          <material><ambient>0.36 0.47 0.30 1</ambient><diffuse>0.36 0.47 0.30 1</diffuse><specular>0.02 0.02 0.02 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="landasan">
+      <static>true</static>
+      <pose>0 0 -0.0015 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>1.6 1.6 0.004</size></box></geometry>
+          <material><ambient>0.62 0.62 0.60 1</ambient><diffuse>0.62 0.62 0.60 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="kompas">
+      <static>true</static>
+      <link name="link">
+        <visual name="sumbu_ns"><pose>0 0 0.0008 0 0 0</pose><geometry><box><size>6.4 0.025 0.002</size></box></geometry>
+          <material><ambient>0.8 0.8 0.8 1</ambient><diffuse>0.8 0.8 0.8 1</diffuse></material></visual>
+        <visual name="sumbu_ew"><pose>0 0 0.0008 0 0 0</pose><geometry><box><size>0.025 6.4 0.002</size></box></geometry>
+          <material><ambient>0.8 0.8 0.8 1</ambient><diffuse>0.8 0.8 0.8 1</diffuse></material></visual>
+        <visual name="utara"><pose>3.2 0 0.15 0 1.5708 0</pose><geometry><cone><radius>0.14</radius><length>0.45</length></cone></geometry>
+          <material><ambient>0.9 0.1 0.1 1</ambient><diffuse>0.9 0.1 0.1 1</diffuse></material></visual>
+        <visual name="timur"><pose>0 -3.2 0.12 0 0 0</pose><geometry><box><size>0.24 0.24 0.24</size></box></geometry>
+          <material><ambient>0.1 0.7 0.2 1</ambient><diffuse>0.1 0.7 0.2 1</diffuse></material></visual>
+        <visual name="selatan"><pose>-3.2 0 0.12 0 0 0</pose><geometry><box><size>0.24 0.24 0.24</size></box></geometry>
+          <material><ambient>0.95 0.95 0.95 1</ambient><diffuse>0.95 0.95 0.95 1</diffuse></material></visual>
+        <visual name="barat"><pose>0 3.2 0.12 0 0 0</pose><geometry><box><size>0.24 0.24 0.24</size></box></geometry>
+          <material><ambient>0.95 0.8 0.1 1</ambient><diffuse>0.95 0.8 0.1 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="sun_ball">
+      <static>true</static>
+      <pose>0 -2.5 2.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <cast_shadows>false</cast_shadows>
+          <geometry><sphere><radius>0.16</radius></sphere></geometry>
+          <material><ambient>1 0.9 0.2 1</ambient><diffuse>1 0.9 0.2 1</diffuse><emissive>1 0.85 0.1 1</emissive></material>
+        </visual>
+      </link>
+    </model>
+
+    <include>
+      <uri>file:///home/riyadh/mk/solar_tracker/solar_tracker_stepper.urdf</uri>
+      <name>solar_tracker</name>
+    </include>
+  </world>
+</sdf>

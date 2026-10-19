@@ -1,0 +1,32 @@
+# Jurnal pihak ketiga: berhak cipta, TIDAK diunggah ke repo publik.
+# Simpan sendiri di lokal. Ringkasan dan pemetaannya ada di sistem_cps_tracker_pens.md bagian 1.
+jurnalrandom/
+
+# Lingkungan Python dan cache
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Log mentah hasil percobaan (puluhan MB, dapat dibuat ulang)
+New folder (2)/logs/
+
+# Dump CAD besar yang sudah digantikan parts_v2 dan solar_tracker/meshes
+New folder (2)/solar_stl/parts/
+New folder (2)/solar_stl/solar_all.stl
+New folder (2)/solar.stl
+New folder (2)/solar copy.stp
+solar(1).stl
+
+# Hasil antara LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Berkas sementara sistem
+Thumbs.db
+.DS_Store
