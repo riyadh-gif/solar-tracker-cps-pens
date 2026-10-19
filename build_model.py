@@ -4,7 +4,7 @@ Pose nol: rel panel horizontal (CAD asli miring 21.24 derajat, diputar balik di 
 Engsel kemiringan searah rel panjang (+x alat = Utara, KEPUTUSAN pengguna: panel hanya berguling kanan-kiri, tidak jungkat-jungkit sepanjang rel). Pada q1 = 0 panel miring ke Timur untuk q2 > 0.
 Dunia = frame dasar: +x = Utara (ASUMSI), +y = Barat, +z = atas. Azimuth CW (kompas), arah miring kompas = q1 + HEAD (HEAD = 90).
 Gazebo: link 'world' + sendi tetap mengikat dasar. Kontrol posisi (actuator pid) disetel ke kekakuan seri stepper dan poros dari dinamika/dyn_model.py:
-linier, tanpa tundaan sirkuit, tanpa lepas langkah, torsi dibatasi torsi tahan 3 N.m.
+linier, tanpa tundaan sirkuit, tanpa lepas langkah, torsi dibatasi torsi tahan Th (dyn_model.AXES).
 """
 import json
 import sys
@@ -152,7 +152,7 @@ def main():
     <origin xyz="{P_AZ[0]} {P_AZ[1]} {P_AZ[2]}"/><axis xyz="0 0 -1"/><dynamics damping="{JOINT_DAMP}" friction="{JOINT_FRIC}"/></joint>
   <joint name="elevation_joint" type="revolute"><parent link="azimuth_link"/><child link="elevation_link"/>
     <origin xyz="{(P_EL - P_AZ)[0]} {(P_EL - P_AZ)[1]} {(P_EL - P_AZ)[2]:.4f}"/><axis xyz="1 0 0"/><dynamics damping="{JOINT_DAMP}" friction="{JOINT_FRIC}"/>
-    <limit lower="{-EL_LIMIT:.4f}" upper="{EL_LIMIT:.4f}" effort="3" velocity="1"/></joint>
+    <limit lower="{-EL_LIMIT:.4f}" upper="{EL_LIMIT:.4f}" effort="{D.AXES['elevasi'].Th}" velocity="1"/></joint>
   <joint name="panel_joint" type="fixed"><parent link="elevation_link"/><child link="panel"/></joint>
 {ldr_xml}{gazebo_xml()}</robot>
 """

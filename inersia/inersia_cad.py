@@ -198,7 +198,7 @@ def main():
           f"- J_az pada q2 = 45 deg: **{res['J_az45']:.4e} kg m2** (selisih {100 * (res['J_az45'] / res['J_az0'] - 1):+.1f}%)",
           f"- J_el (elevation_link + panel, sumbu x lewat P_EL): **{res['J_el']:.4e} kg m2**",
           f"- COM elevation_link + panel di frame elevasi: {np.round(el.c * 1e3, 1).tolist()} mm; lengan ketidakseimbangan: y = {r[1] * 1e3:.1f} mm, z = {r[2] * 1e3:.1f} mm, radial yz = **{res['arm_xz'] * 1e3:.1f} mm**",
-          f"- Momen gravitasi terhadap sumbu elevasi: M(q) = m g (y cos q - z sin q). Maksimum dalam batas +-45 deg = **{res['Mg_max']:.3f} N.m** (q = 0: {res['Mg_q0']:.3f} N.m; batas atas tanpa batas sudut {res['Mg_bound']:.3f} N.m). Massa elevasi + panel = {el.m:.3f} kg. Bandingkan dengan torsi motor 3 N.m.",
+          f"- Momen gravitasi terhadap sumbu elevasi: M(q) = m g (y cos q - z sin q). Maksimum dalam batas +-45 deg = **{res['Mg_max']:.3f} N.m** (q = 0: {res['Mg_q0']:.3f} N.m; batas atas tanpa batas sudut {res['Mg_bound']:.3f} N.m). Massa elevasi + panel = {el.m:.3f} kg. Bandingkan dengan torsi motor 1.5 N.m (57HSE1.5N).",
           f"- Massa total bagian yang berputar (azimuth + elevasi + panel): **{res['M_rot']:.3f} kg**\n",
           "## 4. Kekakuan puntir poros baja 8 mm (bagian 19)\n",
           f"k = G J / L, G = 79 GPa, d = 8 mm, J = pi d^4 / 32 = {np.pi * d ** 4 / 32:.3e} m4, L = {L * 1e3:.1f} mm (panjang bounding box mesh bagian 19 sepanjang y) menghasilkan **{kt:.0f} N.m/rad**. Ini hanya angka referensi geometri poros, bukan kekakuan sendi sebenarnya (sendi nyata dipengaruhi kopling, motor, kelonggaran).\n",

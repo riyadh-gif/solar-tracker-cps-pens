@@ -16,7 +16,7 @@ G_STEEL = 79e9
 @dataclass
 class Axis:
     name: str = "elevasi"
-    Th: float = 3.0        # N.m torsi tahan 57HSE3.0N (nominal, dari nama motor)
+    Th: float = 1.5        # N.m torsi tahan 57HSE1.5N (nominal, dari nama motor; datasheet belum ada)
     Nr: int = 50           # gigi rotor (stepper 1.8 deg)
     Jm: float = 1.1e-4     # kg.m2 inersia rotor (asumsi, NEMA23 3 N.m)
     k: float = 321.0       # N.m/rad kekakuan puntir poros (poros baja 8 mm, 100 mm; hitung G J / L) (asumsi)

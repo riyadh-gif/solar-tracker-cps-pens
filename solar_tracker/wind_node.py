@@ -1,6 +1,6 @@
 """Node ROS 2: angin dan torsi gangguan untuk aktuator `pid` (kekakuan seri stepper), tanpa stepper_node.
 Mode pid memakai kontrol posisi bergain K = kekakuan seri stepper dan poros (build_model.stiffness_gains). Gaya kontrol F = K (cmd - q) bersifat linier,
-jadi torsi luar tau setara persis dengan pergeseran perintah delta = tau / K (M q'' = K (cmd - q) + tau = K (cmd + tau/K - q)); kejenuhan 3 N.m diabaikan
+jadi torsi luar tau setara persis dengan pergeseran perintah delta = tau / K (M q'' = K (cmd - q) + tau = K (cmd + tau/K - q)); kejenuhan Th diabaikan
 (lepas langkah tidak dimodelkan di mode pid, itu urusan actuator:=stepper). Gazebo tidak menjumlahkan ApplyJointForce dengan pengendali posisi (diuji: tak berefek),
 sebab itu angin disuntikkan lewat perintah.
 Masukan: /solar_tracker/azimuth_cmd dan /elevation_cmd (Float64, rad; dari sun_command_node, panel, atau skrip), /joint_states.
@@ -53,8 +53,9 @@ def delta_cmd(ax, tau):
 def selftest():
     for nm, ax in D.AXES.items():
         assert abs(delta_cmd(ax, kseri(ax)) - 1.0) < 1e-12
-    # nilai yang dipakai build_model.stiffness_gains: azimuth 137.14, elevasi 101.82 N.m/rad
-    assert abs(kseri(D.AXES["azimuth"]) - 137.14) < 0.01 and abs(kseri(D.AXES["elevasi"]) - 101.82) < 0.01
+    # nilai yang dipakai build_model.stiffness_gains. Tripwire: SENGAJA dipatok supaya perubahan Th atau k gagal berisik.
+    # Th 3.0 -> 1.5 (57HSE1.5N) menurunkan ini dari 137.14 / 101.82.
+    assert abs(kseri(D.AXES["azimuth"]) - 71.64) < 0.01 and abs(kseri(D.AXES["elevasi"]) - 60.65) < 0.01
     print("selftest wind_node: lolos")
 
 

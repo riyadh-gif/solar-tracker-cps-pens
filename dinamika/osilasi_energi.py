@@ -5,7 +5,7 @@ sampai tenang, dan berapa energi yang hilang karenanya. Dibandingkan empat strat
 
 Model (aktuator `pid`, yang didukung di Gazebo), per sumbu, keadaan x = [q, q']:
     J(q2) q'' = sat(K (cmd - q), +-Th) - bl q' - fc tanh(q'/2e-3) + tau_grav(q) + tau_angin(t)
-    K  = kekakuan seri stepper dan poros 1/(1/(Th Nr) + 1/k)   (azimuth 137.14, elevasi 101.82 N.m/rad)
+    K  = kekakuan seri stepper dan poros 1/(1/(Th Nr) + 1/k)   (Th 1.5: azimuth 71.64, elevasi 60.65 N.m/rad)
     tau_grav elevasi = -m g (cy cos q - cz sin q), dari inersia/inersia_link.json (tanda tervalidasi di Gazebo)
     J_az(q2) = a + b cos^2(q2)  (kopling antar sumbu; cocok 2 titik dari J_az pada q2 = 0 dan 45 deg)
 Perintah selalu dibulatkan ke tangga microstep: itulah sumber eksitasi yang sebenarnya.
@@ -119,7 +119,7 @@ def rate_limit(u, dt, vmax, amax):
 def build_cmd(strategy, q_raw, dt, ax, micro, vmax, amax):
     """Perintah akhir: bentuk dulu, lalu DIBULATKAN ke tangga microstep (driver hanya bisa langkah bulat).
     `zv` dan `zvd` dipasang DI ATAS profil trapesium, bukan di atas lompatan mentah: pada lompatan besar
-    kontroler jenuh di Th = 3 N.m, geraknya jadi bang-bang, dan input shaper (yang mengandaikan sistem linier)
+    kontroler jenuh di Th, geraknya jadi bang-bang, dan input shaper (yang mengandaikan sistem linier)
     sama sekali tidak berefek (terbukti: lewatan 71.2 % sama persis dengan dan tanpa ZV)."""
     u = np.asarray(q_raw, float)
     if strategy != "langsung":
@@ -330,7 +330,7 @@ def run_window(w, strategy, wind_kind, seed, dt, micro, vmax, amax, raw=None):
     ang = lambda a, b: math.degrees(math.acos(max(-1.0, min(1.0, float(tracker.fk(a, b) @ s)))))
     err = np.array([ang(a, b) for a, b in zip(q1, q2)])
     err_c = np.array([ang(a, b) for a, b in zip(c1, c2)])
-    # diagnostik lepas sinkron: momen angin melewati torsi tahan 3 N.m, dan simpangan melewati satu siklus listrik 7.2 deg
+    # diagnostik lepas sinkron: momen angin melewati torsi tahan Th, dan simpangan melewati satu siklus listrik 7.2 deg
     if wd is None:
         f_pull, runaway = 0.0, False
     else:
@@ -458,7 +458,7 @@ def sweep(date="2026-10-07", hours=(9.5, 11.2, 13.0, 14.5), T=60.0, dt=1e-3,
                                                       ["angin", "strategi", "jam", "ayun az pp", "ayun el pp", "bias az",
                                                        "bias el", "galat total (deg)", "galat dinamik (deg)", "daya (W)", "rugi (%)"]),
             "\n## 5. Batas\n",
-            "- Model aktuator `pid` (linier dengan kejenuhan 3 N.m). Stepper sebenarnya bertorsi `Th sin(Nr delta)` yang MENURUN "
+            "- Model aktuator `pid` (linier dengan kejenuhan Th). Stepper sebenarnya bertorsi `Th sin(Nr delta)` yang MENURUN "
             "setelah 1.8 deg, jadi angka di sini optimistis saat selisih besar; lepas langkah tidak dimodelkan.\n"
             "- Redaman sendi 0.2 N.m.s/rad dan gesekan 0.05 N.m masih ASUMSI dan paling menentukan lama ayunan.\n"
             "- Suku Coriolis diabaikan; kopling antar sumbu hanya lewat J_az(q2).\n"

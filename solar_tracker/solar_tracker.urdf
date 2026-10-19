@@ -17,7 +17,7 @@
     <origin xyz="0.0 0.0 0.165"/><axis xyz="0 0 -1"/><dynamics damping="0.2" friction="0.05"/></joint>
   <joint name="elevation_joint" type="revolute"><parent link="azimuth_link"/><child link="elevation_link"/>
     <origin xyz="0.0 0.0 0.0395"/><axis xyz="1 0 0"/><dynamics damping="0.2" friction="0.05"/>
-    <limit lower="-0.7854" upper="0.7854" effort="3" velocity="1"/></joint>
+    <limit lower="-0.7854" upper="0.7854" effort="1.5" velocity="1"/></joint>
   <joint name="panel_joint" type="fixed"><parent link="elevation_link"/><child link="panel"/></joint>
   <link name="ldr_x_pos"><visual><geometry><cylinder radius="0.006" length="0.004"/></geometry><material name="ldr"/></visual></link>
   <joint name="ldr_x_pos_joint" type="fixed"><parent link="elevation_link"/><child link="ldr_x_pos"/><origin xyz="0.3344 0.0092 0.0672"/></joint>
@@ -30,10 +30,10 @@
   <gazebo>
     <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher"/>
     <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
-      <joint_name>azimuth_joint</joint_name><p_gain>137.14</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>3.0</cmd_max><cmd_min>-3.0</cmd_min>
+      <joint_name>azimuth_joint</joint_name><p_gain>71.64</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>1.5</cmd_max><cmd_min>-1.5</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
-      <joint_name>elevation_joint</joint_name><p_gain>101.82</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>3.0</cmd_max><cmd_min>-3.0</cmd_min>
+      <joint_name>elevation_joint</joint_name><p_gain>60.65</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>1.5</cmd_max><cmd_min>-1.5</cmd_min>
     </plugin>
   </gazebo>
 </robot>
