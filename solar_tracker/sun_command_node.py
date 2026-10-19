@@ -98,7 +98,7 @@ def shaper_taps(kind, ax, dt):
     """Impuls input shaper -> (amplitudo, jeda dalam cuplikan) untuk satu sumbu. Lihat dinamika/osilasi_energi.py."""
     if kind not in ("zv", "zvd"):
         return [(1.0, 0)]
-    K_ser = 1 / (1 / (ax.Th * ax.Nr) + 1 / ax.k)
+    K_ser = ax.K_ser()   # ikut Kp: shaper MERETUNE DIRI saat loop ditutup
     zeta = ax.bl / (2 * math.sqrt(K_ser * ax.JL))
     f = math.sqrt(K_ser / ax.JL) / (2 * math.pi)
     K = math.exp(-math.pi * zeta / math.sqrt(1 - zeta ** 2))

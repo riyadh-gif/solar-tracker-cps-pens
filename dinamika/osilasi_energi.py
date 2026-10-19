@@ -54,7 +54,7 @@ JAZ_A = _J["dinamika"]["J_az_q0_kgm2"] - JAZ_B
 
 
 def kseri(ax):
-    return 1 / (1 / (ax.Th * ax.Nr) + 1 / ax.k)
+    return ax.K_ser()   # satu sumber: dyn_model.Axis.K_ser (ikut Kp loop tertutup)
 
 
 def j_az(q2):

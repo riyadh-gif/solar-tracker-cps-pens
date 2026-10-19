@@ -18,7 +18,9 @@ class Axis:
     name: str = "elevasi"
     Th: float = 1.5        # N.m torsi tahan 57HSE1.5N (nominal, dari nama motor; datasheet belum ada)
     Nr: int = 50           # gigi rotor (stepper 1.8 deg)
-    Jm: float = 1.1e-4     # kg.m2 inersia rotor (asumsi, NEMA23 3 N.m)
+    Jm: float = 1.1e-4     # kg.m2 inersia rotor (asumsi, NEMA23; datasheet 57HSE1.5N belum ada)
+    Kp: float = 0.0        # N.m/rad kekakuan tambahan loop posisi driver pada ROTOR. 0 = loop TERBUKA (stepper polos).
+    #                        Kp besar = loop TERTUTUP: driver memaku rotor ke perintah, beban hanya merasakan poros k.
     k: float = 321.0       # N.m/rad kekakuan puntir poros (poros baja 8 mm, 100 mm; hitung G J / L) (asumsi)
     zeta: float = 0.02     # rasio redaman mode poros (asumsi)
     bm: float = 5e-3       # N.m.s/rad redaman rotor dan driver (asumsi)
@@ -34,9 +36,15 @@ class Axis:
     def c(self):
         return 2 * self.zeta * math.sqrt(self.k * self.Jm * self.JL / (self.Jm + self.JL))
 
+    def K_ser(self):
+        """Kekakuan kecil-sinyal yang DIRASAKAN BEBAN: pegas magnet (Th Nr) diperkuat loop posisi driver (Kp),
+        seri dengan poros k. Satu-satunya sumber kebenaran; build_model, sun_command_node, wind_node dan
+        osilasi_energi semuanya memanggil ini. Kp = 0 memberi nilai loop terbuka lama persis."""
+        return 1 / (1 / (self.Th * self.Nr + self.Kp) + 1 / self.k)
+
     def freqs_hz(self):
         """Frekuensi alami (Hz) dari rotor yang tertahan kekakuan stepper Kh = Th Nr, poros k, dan beban JL."""
-        Kh = self.Th * self.Nr
+        Kh = self.Th * self.Nr + self.Kp
         K = np.array([[Kh + self.k, -self.k], [-self.k, self.k]])
         M = np.diag([self.Jm, self.JL])
         w2 = np.linalg.eigvals(np.linalg.inv(M) @ K).real
@@ -48,17 +56,38 @@ def wind_torque(ax, v, cn=1.2, rho=1.2):
     return 0.5 * rho * v ** 2 * cn * ax.area * ax.arm
 
 
+def rotor_offset(ax, tau, iters=60):
+    """Simpangan rotor e (rad) yang menahan torsi tau: selesaikan sat(Th sin(Nr e) + Kp e, +-Th) = tau.
+
+    Kp = 0 memakai bentuk tertutup asin(tau/Th)/Nr yang lama, jadi hasil loop terbuka tidak bergeser
+    satu digit pun. Kp > Th Nr membuat g(e) monoton sehingga bisection sah."""
+    if ax.Kp == 0.0:
+        return np.arcsin(np.clip(tau / ax.Th, -1, 1)) / ax.Nr
+    t = np.clip(np.asarray(tau, dtype=float), -ax.Th, ax.Th)
+    hi = np.abs(t) / ax.Kp + math.pi / (2 * ax.Nr)
+    lo = -hi
+    for _ in range(iters):
+        mid = 0.5 * (lo + hi)
+        turun = ax.Th * np.sin(ax.Nr * mid) + ax.Kp * mid < t
+        lo = np.where(turun, mid, lo)
+        hi = np.where(turun, hi, mid)
+    return 0.5 * (lo + hi)
+
+
 def integrate(ax, cmd, tau, T, tau0=0.0, M=1, dt=1e-4, rec=10):
     """cmd(t) dan tau(t) mengembalikan larik (M,) (rad, N.m). Awal: kesetimbangan statis dengan beban tau0.
     Kembalikan t, thl, thm_dev (Nr (thm - cmd) pada rotor, untuk deteksi lepas sinkron)."""
-    th0 = cmd(0.0) - np.arcsin(np.clip(tau0 / ax.Th, -1, 1)) / ax.Nr
+    th0 = cmd(0.0) - rotor_offset(ax, tau0)
     y = np.array([th0, np.zeros(M), th0 - tau0 / ax.k, np.zeros(M)], dtype=float)
     c, n = ax.c, int(round(T / dt))
     ts, thl, dev = [], [], []
 
     def f(t, y, cm, tw):
         thm, wm, tl, wl = y
-        tm = -ax.Th * np.sin(ax.Nr * (thm - cm)) - ax.bm * wm
+        e = thm - cm
+        # Kejenuhan di Th berlaku untuk pegas magnet DAN loop driver: driver tidak bisa melebihi torsi tahan.
+        # Kp = 0 membuat clip tidak aktif (|Th sin| <= Th), jadi identik dengan model loop terbuka lama.
+        tm = -np.clip(ax.Th * np.sin(ax.Nr * e) + ax.Kp * e, -ax.Th, ax.Th) - ax.bm * wm
         tsh = ax.k * (thm - tl) + c * (wm - wl)
         return np.array([wm, (tm - tsh) / ax.Jm, wl, (tsh - ax.bl * wl - ax.fc * np.tanh(wl / 2e-3) - tw) / ax.JL])
 

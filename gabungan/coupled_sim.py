@@ -36,12 +36,13 @@ CTRLS = H.CTRLS
 def defl(tau, ax):
     """Defleksi kuasi-statis (deg, bertanda) untuk momen penggerak tau (N.m)."""
     a = abs(tau)
-    return math.copysign(math.degrees(math.asin(min(a / ax.Th, 0.999)) / ax.Nr + a / ax.k), tau)
+    return math.copysign(math.degrees(float(D.rotor_offset(ax, min(a, 0.999 * ax.Th))) + a / ax.k), tau)
 
 
 def slip_table(ax):
     """|siklus listrik| yang lepas (1 siklus = 360/Nr deg) setelah denyut torsi: baris = RATIOS, kolom = DURS. Dari ODE (cache JSON)."""
-    sig = json.dumps([ax.Th, ax.Nr, ax.Jm, ax.k, ax.JL, ax.bl, ax.fc, ax.zeta, ax.bm, ax.grav])
+    # ax.Kp WAJIB ada di sini: tanpa itu cache JSON bertahan diam-diam saat loop ditutup dan memberi hitungan slip salah TANPA galat.
+    sig = json.dumps([ax.Th, ax.Nr, ax.Jm, ax.k, ax.JL, ax.bl, ax.fc, ax.zeta, ax.bm, ax.grav, ax.Kp])
     f = HERE / f"slip_table_{ax.name}.json"
     if f.exists():
         c = json.loads(f.read_text())

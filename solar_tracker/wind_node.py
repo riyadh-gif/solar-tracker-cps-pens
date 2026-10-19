@@ -42,7 +42,7 @@ DTW = 0.25   # resolusi deret angin (s), sama dengan gabungan/coupled_sim.py
 
 
 def kseri(ax):
-    return 1 / (1 / (ax.Th * ax.Nr) + 1 / ax.k)
+    return ax.K_ser()   # satu sumber: dyn_model.Axis.K_ser (ikut Kp loop tertutup)
 
 
 def delta_cmd(ax, tau):

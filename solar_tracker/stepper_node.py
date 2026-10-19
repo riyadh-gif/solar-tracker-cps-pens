@@ -39,12 +39,15 @@ JOINT = {"azimuth": "azimuth_joint", "elevasi": "elevation_joint"}
 DTW = 0.25   # resolusi deret angin (s), sama dengan gabungan/coupled_sim.py
 
 
-def stepper_torque(delta, Th, Nr, k):
-    """Selesaikan tau = Th sin(Nr (delta - tau/k)) dengan bisection (monoton bila k > Th Nr). delta dalam rad."""
+def stepper_torque(delta, ax):
+    """Selesaikan tau = sat(Th sin(Nr e) + Kp e, +-Th) dengan e = delta - tau/k, lewat bisection.
+    Kp = 0 (loop terbuka) membuat clip tidak aktif, jadi identik dengan model lama. delta dalam rad."""
+    Th, Nr, k, Kp = ax.Th, ax.Nr, ax.k, ax.Kp
     lo, hi = -Th, Th
     for _ in range(40):
         mid = 0.5 * (lo + hi)
-        if mid - Th * math.sin(Nr * (delta - mid / k)) > 0:
+        e = delta - mid / k
+        if mid - max(-Th, min(Th, Th * math.sin(Nr * e) + Kp * e)) > 0:
             hi = mid
         else:
             lo = mid
@@ -55,21 +58,21 @@ def selftest():
     """Tanpa ROS: sifat model torsi."""
     for nm, ax in D.AXES.items():
         assert ax.k > ax.Th * ax.Nr, f"k {nm} harus > Th Nr agar model unik"
-        s0 = stepper_torque(0.0, ax.Th, ax.Nr, ax.k)
+        s0 = stepper_torque(0.0, ax)
         assert abs(s0) < 1e-9
         # defleksi kecil: tau ~ K_seri * delta, K_seri = 1/(1/(Th Nr) + 1/k)
-        kser = 1 / (1 / (ax.Th * ax.Nr) + 1 / ax.k)
+        kser = ax.K_ser()
         d = 1e-4
-        assert abs(stepper_torque(d, ax.Th, ax.Nr, ax.k) / d - kser) / kser < 0.01, (nm, kser)
+        assert abs(stepper_torque(d, ax) / d - kser) / kser < 0.01, (nm, kser)
         # periodik dalam 2 pi / Nr dan terbatas oleh Th
         for dd in (0.013, 0.05, 0.31):
-            t1 = stepper_torque(dd, ax.Th, ax.Nr, ax.k)
-            t2 = stepper_torque(dd + 2 * math.pi / ax.Nr, ax.Th, ax.Nr, ax.k)
+            t1 = stepper_torque(dd, ax)
+            t2 = stepper_torque(dd + 2 * math.pi / ax.Nr, ax)
             assert abs(t1 - t2) < 1e-6 and abs(t1) <= ax.Th + 1e-9
         # defleksi statis untuk torsi beban sama dengan rumus dyn_model/coupled_sim
         tau = 0.9
-        delta = math.asin(tau / ax.Th) / ax.Nr + tau / ax.k
-        assert abs(stepper_torque(delta, ax.Th, ax.Nr, ax.k) - tau) < 1e-6
+        delta = float(D.rotor_offset(ax, tau)) + tau / ax.k
+        assert abs(stepper_torque(delta, ax) - tau) < 1e-6
     print("selftest stepper_node: lolos")
 
 
@@ -165,7 +168,7 @@ def main():
                 self.cmd[nm] = round(self.cmd_f[nm] / step) * step     # tangga microstep
                 th_pred = self.th[nm] + self.w[nm] * horizon      # kompensasi tundaan: sudut beban diekstrapolasi
                 delta = self.cmd[nm] - th_pred
-                tau = stepper_torque(delta, ax.Th, ax.Nr, ax.k) - damp * self.w[nm] + tw[nm] + extra[nm]
+                tau = stepper_torque(delta, ax) - damp * self.w[nm] + tw[nm] + extra[nm]
                 self.pub[nm].publish(Float64(data=tau))
                 row += [math.degrees(self.cmd[nm]), math.degrees(self.th[nm]), math.degrees(delta), tau]
             self.n += 1
