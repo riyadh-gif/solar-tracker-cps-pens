@@ -266,7 +266,11 @@ def selftest():
     assert abs(abs(tau_grav_el(math.radians(-45))) - _J["dinamika"]["Mg_max_dalam_batas_45deg_Nm"]) < 2e-3
     assert tau_grav_el(0.0) < 0, "gravitasi harus menarik q2 ke arah negatif (terukur -0.161 deg di Gazebo)"
     d0 = math.degrees(quasi_static(0.0, a_el, 0.0, True))
-    assert -0.20 < d0 < -0.12, f"defleksi q2=0 harus sekitar -0.155 deg, dapat {d0:.3f}"
+    # Diturunkan dari K_ser, BUKAN dipatok: defleksi = Mg(q2=0) / K_ser, jadi ikut berubah saat Th atau Kp berubah.
+    # Riwayat: loop terbuka Th=3.0 memberi -0.155 deg (terukur -0.161 deg di Gazebo); Th=1.5 memberi -0.260 deg;
+    # loop TERTUTUP (Kp=KP_NOM) memberi -0.050 deg karena beban hanya merasakan poros k.
+    d_harap = -math.degrees(abs(tau_grav_el(0.0)) / a_el.K_ser())
+    assert abs(d0 - d_harap) < 0.02, f"defleksi q2=0 harus sekitar {d_harap:.3f} deg, dapat {d0:.3f}"
     # 2) inersia azimuth: cocok di dua titik acuan
     assert abs(j_az(0.0) - _J["dinamika"]["J_az_q0_kgm2"]) < 1e-9
     assert abs(j_az(math.radians(45)) - _J["dinamika"]["J_az_q45_kgm2"]) < 1e-9

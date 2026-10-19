@@ -12,6 +12,10 @@ Loop tertutup: driver memaksa rotor ke perintah, pegas magnet diperkuat penguata
 Akibatnya sistem jadi LEBIH KAKU tetapi KURANG TEREDAM, karena zeta = b / (2 sqrt(K J))
 turun ketika K naik sedangkan b tetap. Lewatan justru memburuk.
 
+CATATAN Th: pada limit rotor terpaku K_ser -> k, jadi Th HILANG sama sekali dari kekakuan.
+Th (3.0 -> 1.5 N.m, 57HSE3.0N -> 57HSE1.5N) hanya menggeser kolom loop TERBUKA dan
+langit-langit torsi; kolom loop tertutup tidak bergerak sedikit pun.
+
 Jalankan: ~/.venvs/solar/bin/python dinamika/loop_tertutup.py
 Keluaran: dinamika/loop_tertutup_results.md
 """
@@ -20,8 +24,8 @@ from pathlib import Path
 
 import numpy as np
 
-TH, NR = 3.0, 50
-KH = TH * NR          # 150 N.m/rad, pegas magnet stepper (Th * Nr)
+TH, NR = 1.5, 50     # 57HSE1.5N (dulu 3.0 N.m; Th hanya memengaruhi kolom loop TERBUKA, lihat catatan)
+KH = TH * NR          # 75 N.m/rad, pegas magnet stepper (Th * Nr)
 JM = 1.1e-4           # kg.m2 inersia rotor (ASUMSI, NEMA23 3 N.m)
 BL = 0.2              # N.m.s/rad redaman viskos beban (ASUMSI, paling menentukan)
 STEP16 = 1.8 / 16     # deg per microstep 1/16
@@ -74,8 +78,12 @@ def md(rows, cols):
 
 def main():
     out = ["# Dampak stepper loop tertutup (enkoder di rotor)\n",
-           "Dihasilkan oleh `dinamika/loop_tertutup.py`. Kolom loop terbuka mereproduksi angka yang sudah "
-           "tervalidasi terhadap Gazebo (4,79 Hz, 93,3 %, 1,51 s), jadi modelnya berjangkar.\n"]
+           "Dihasilkan oleh `dinamika/loop_tertutup.py`.\n\n"
+           "**PERHATIAN, tabel ini belum tervalidasi.** Angka Gazebo yang dulu tervalidasi (azimuth 4,79 Hz "
+           "prediksi berbanding 5,19 Hz terukur, lewatan 93,3 % berbanding 90 %) berasal dari motor LAMA "
+           "57HSE3.0N pada loop terbuka. Dengan 57HSE1.5N kolom loop terbuka di bawah menjadi 3,46 Hz, jadi "
+           "tabel ini TIDAK lagi berjangkar pada pengukuran Gazebo mana pun. Validasi ulang lewat "
+           "`rec_step.py` dan `rec_shaped.py` belum dijalankan.\n"]
 
     # A. perbandingan pokok
     rows, H = [], {}

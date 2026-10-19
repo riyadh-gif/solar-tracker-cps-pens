@@ -175,6 +175,37 @@ def self_check():
 
 # JL, k elevasi, grav dari inersia/ (motor 1.2 kg dan panel 1.5 kg adalah ASUMSI; J_el 0.0543 (sumbu x searah rel), J_az(q2=0) 0.1514; sensitivitas massa motor 0.9 sampai 1.6 kg mengubah J_az kurang dari 1.5%)
 # k azimuth 1600: poros motor 8 mm sepanjang 20 mm (asumsi); arm angin azimuth 0.152 m (ASUMSI, eksentrisitas 0.23 x sisi panjang 0.670 m)
+# Penguatan posisi driver loop tertutup. ASUMSI: datasheet 57HSE1.5N belum ada.
+#
+# BATAS FISIS YANG MENENTUKAN PILIHAN INI. Torsi driver tetap dibatasi torsi tahan Th, jadi kekakuan
+# kecil-sinyal K_ser hanya terwujud selama simpangan rotor di bawah e_jenuh = Th / (Th Nr + Kp).
+# Di luar itu torsi jenuh dan sistem jadi terbatas-torsi, bukan terbatas-kekakuan.
+#
+#     Kp      K_ser   f_n az   e_jenuh      terhadap microstep 0.1125 deg
+#       0      71.6   3.46 Hz  1.1459 deg   10.2 x      loop terbuka
+#     150     197.3   5.74 Hz  0.3820 deg    3.4 x
+#     300     303.8   7.13 Hz  0.2292 deg    2.0 x      <- KP_NOM
+#     500     423.0   8.41 Hz  0.1495 deg    1.3 x
+#    1500     793.7  11.52 Hz  0.0546 deg    0.5 x      jenuh dalam satu microstep
+#     1e9    1600.0  16.36 Hz  0.0000 deg    0.0 x      TIDAK FISIS
+#
+# "Rotor terpaku" (Kp -> tak hingga) TIDAK dapat dipakai sebagai batas konservatif: pada nilai itu
+# simpangan linier runtuh ke nol, torsi selalu jenuh, dan f_n 16,36 Hz tidak pernah terwujud pada
+# amplitudo mana pun. ODE di osilasi_energi.py membuktikannya: ia mengukur dering 6,20 Hz, bukan 16,36.
+#
+# KP_NOM = 300 dipilih sebagai nilai terkaku yang masih menyisakan jangkauan linier sekitar dua
+# microstep, yaitu syarat minimum agar loop posisi punya arti di antara langkah. Ganti begitu
+# datasheet tiba. Kp = 0 mengembalikan seluruh perilaku loop terbuka.
+# BELUM DIPAKAI. AXES di bawah masih Kp=0 (loop terbuka) sampai dua hal selesai:
+#   1. datasheet 57HSE1.5N memberi penguatan posisi driver yang sebenarnya;
+#   2. pertanyaan kejenuhan di atas terjawab, yaitu pada amplitudo kerja (satu microstep) apakah
+#      driver tetap linier. ODE di osilasi_energi.py TIDAK setuju dengan prediksi kecil-sinyal
+#      pada Kp = 300 (mengukur 5,92 Hz, prediksi 7,13 Hz), yang menandakan torsi jenuh saat
+#      transien. Selama itu belum dipahami, menyetel Kp hanya memindahkan galat.
+# Menutup loop = ganti Kp=0 menjadi Kp=KP_NOM di AXES. Seluruh rantai (gain Gazebo, shaper ZVD,
+# wind_node, osilasi_energi) ikut sendiri lewat Axis.K_ser().
+KP_NOM = 300.0
+
 AXES = {"elevasi": Axis(JL=0.0543, k=317.0, grav=1.274),
         "azimuth": Axis(name="azimuth", k=1600.0, JL=0.1514, arm=0.152, grav=0.0)}
 
