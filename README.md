@@ -24,9 +24,16 @@ ball marks the sun direction computed by pvlib, and the shadow shows the true an
 ![The real rig: two stacked 57HSE3.0N steppers on an aluminium extrusion frame](WhatsApp%20Image%202026-09-28%20at%2011.38.49.jpeg)
 
 The real hardware, 28 September 2026. Two stacked 57HSE3.0N motors: the lower one rotates azimuth, the upper
-one tilts the panel about the rails. Both are coupled directly to the shafts with no gearbox, and there is
-**no encoder**. The panel, the LDRs and the power wiring are not yet mounted. This is the rig that has to be
-measured to replace the assumed parameters.
+one tilts the panel about the rails. Both are coupled directly to the shafts with no gearbox. The panel, the
+LDRs and the power wiring are not yet mounted. This is the rig that has to be measured to replace the
+assumed parameters.
+
+> **Design change pending in the model.** The motors have since moved to **closed-loop** drivers with shaft
+> encoders. Everything in this repo still models the open-loop stepper. The impact is analysed in
+> `dinamika/loop_tertutup_results.md`: the system becomes stiffer but **less damped** (azimuth 4.79 to
+> 16.4 Hz, zeta 0.0220 to 0.0064), and the **ZVD input shaper must be retuned** or it loses most of its
+> effect. Step loss disappears; static misalignment does not, because the encoder sits on the rotor and
+> cannot see shaft twist or mounting error.
 
 ---
 
