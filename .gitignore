@@ -30,3 +30,7 @@ solar(1).stl
 # Berkas sementara sistem
 Thumbs.db
 .DS_Store
+
+# berkas kerja sementara
+.fase*.py
+.fix.py
