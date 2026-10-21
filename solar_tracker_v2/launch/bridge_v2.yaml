@@ -1,0 +1,26 @@
+# Jembatan ros_gz untuk solar_tracker_v2 (desain baru, reduksi gigi 5.25:1 pada kemiringan).
+# Beda dengan bridge.yaml v1: nama model solar_tracker_v2, dan perintah sendi dijembatani LANGSUNG
+# (tanpa wind_node sebagai perantara), supaya /solar_tracker_v2/*_cmd bisa dipakai tanpa node tambahan.
+- ros_topic_name: "/clock"
+  gz_topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/joint_states"
+  gz_topic_name: "/world/solar_world/model/solar_tracker_v2/joint_state"
+  ros_type_name: "sensor_msgs/msg/JointState"
+  gz_type_name: "gz.msgs.Model"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/solar_tracker_v2/azimuth_cmd"
+  gz_topic_name: "/model/solar_tracker_v2/joint/azimuth_joint/0/cmd_pos"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: ROS_TO_GZ
+
+- ros_topic_name: "/solar_tracker_v2/elevation_cmd"
+  gz_topic_name: "/model/solar_tracker_v2/joint/elevation_joint/0/cmd_pos"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: ROS_TO_GZ

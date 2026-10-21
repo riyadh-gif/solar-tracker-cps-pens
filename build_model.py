@@ -37,7 +37,7 @@ import dyn_model as D   # noqa: E402  (satu sumber konstanta stepper: Th, Nr, k)
 def stiffness_gains():
     """Gain kontrol posisi Gazebo per sendi: p = kekakuan seri stepper dan poros, 1/(1/(Th Nr) + 1/k), linearisasi hukum torsi-sudut di sekitar
     posisi perintah; i = d = 0 (redaman dan gesekan datang dari sendi); batas torsi = torsi tahan Th."""
-    return {j: dict(p=ax.K_ser(), cmd=ax.Th)
+    return {j: dict(p=ax.K_ser(), cmd=ax.Th_L)
             for j, ax in (("azimuth_joint", D.AXES["azimuth"]), ("elevation_joint", D.AXES["elevasi"]))}
 
 

@@ -30,7 +30,36 @@ class Axis:
     grav: float = 0.0      # N.m beban gravitasi tetap pada sumbu (elevasi: maks 1.274 dalam +-45 deg, panel 2.55 kg, g = 10)
     arm: float = 0.0668    # m lengan pusat tekanan angin terhadap sumbu engsel (ASUMSI: 0.15 x 0.445 m, sisi melintang engsel)
     area: float = 0.2982   # m2 luas panel 0.670 x 0.445 (MOS C-50-18-M)
-    step: float = 1.8 / 16  # deg per microstep
+    step: float = 1.8 / 16  # deg per microstep (DI MOTOR; di beban dibagi N, lihat step_beban)
+    N: float = 1.0         # reduksi gigi motor:beban. 1.0 = penggerak langsung (desain lama).
+    #                        Desain baru (build_model_v2.py): kemiringan 42/8 = 5.25, azimuth tetap 1.0.
+
+    # --- besaran yang DIRUJUK KE SISI BEBAN. Dengan N = 1 semuanya sama dengan nilai motor,
+    #     jadi seluruh hasil penggerak langsung tidak bergeser satu digit pun. ---
+    @property
+    def Th_L(self):
+        """Langit-langit torsi di beban (N.m): reduksi melipatkan torsi N kali."""
+        return self.Th * self.N
+
+    @property
+    def Nr_L(self):
+        """Gigi rotor efektif di beban: satu siklus listrik di motor menjadi 1/N putaran di beban."""
+        return self.Nr * self.N
+
+    @property
+    def Kp_L(self):
+        """Penguatan posisi driver dirujuk ke beban: naik N kuadrat."""
+        return self.Kp * self.N ** 2
+
+    @property
+    def Jm_L(self):
+        """Inersia rotor dirujuk ke beban: naik N kuadrat."""
+        return self.Jm * self.N ** 2
+
+    @property
+    def step_beban(self):
+        """Microstep yang terlihat DI BEBAN (deg). Reduksi memperhalus resolusi N kali."""
+        return self.step / self.N
 
     @property
     def c(self):
@@ -39,14 +68,17 @@ class Axis:
     def K_ser(self):
         """Kekakuan kecil-sinyal yang DIRASAKAN BEBAN: pegas magnet (Th Nr) diperkuat loop posisi driver (Kp),
         seri dengan poros k. Satu-satunya sumber kebenaran; build_model, sun_command_node, wind_node dan
-        osilasi_energi semuanya memanggil ini. Kp = 0 memberi nilai loop terbuka lama persis."""
-        return 1 / (1 / (self.Th * self.Nr + self.Kp) + 1 / self.k)
+        osilasi_energi semuanya memanggil ini. Kp = 0 memberi nilai loop terbuka lama persis.
+        Reduksi gigi N menaikkan pegas magnet yang dirujuk ke beban sebesar N kuadrat; poros k sudah di
+        sisi beban jadi tidak diskalakan. N = 1 memberi hasil penggerak langsung lama persis."""
+        return 1 / (1 / (self.Th_L * self.Nr_L + self.Kp_L) + 1 / self.k)
 
     def freqs_hz(self):
-        """Frekuensi alami (Hz) dari rotor yang tertahan kekakuan stepper Kh = Th Nr, poros k, dan beban JL."""
-        Kh = self.Th * self.Nr + self.Kp
+        """Frekuensi alami (Hz) dari rotor yang tertahan kekakuan stepper, poros k, dan beban JL.
+        Semuanya dirujuk ke sisi beban supaya reduksi gigi ikut terhitung."""
+        Kh = self.Th_L * self.Nr_L + self.Kp_L
         K = np.array([[Kh + self.k, -self.k], [-self.k, self.k]])
-        M = np.diag([self.Jm, self.JL])
+        M = np.diag([self.Jm_L, self.JL])
         w2 = np.linalg.eigvals(np.linalg.inv(M) @ K).real
         return np.sqrt(np.sort(w2)) / (2 * math.pi)
 
@@ -62,13 +94,13 @@ def rotor_offset(ax, tau, iters=60):
     Kp = 0 memakai bentuk tertutup asin(tau/Th)/Nr yang lama, jadi hasil loop terbuka tidak bergeser
     satu digit pun. Kp > Th Nr membuat g(e) monoton sehingga bisection sah."""
     if ax.Kp == 0.0:
-        return np.arcsin(np.clip(tau / ax.Th, -1, 1)) / ax.Nr
-    t = np.clip(np.asarray(tau, dtype=float), -ax.Th, ax.Th)
-    hi = np.abs(t) / ax.Kp + math.pi / (2 * ax.Nr)
+        return np.arcsin(np.clip(tau / ax.Th_L, -1, 1)) / ax.Nr_L
+    t = np.clip(np.asarray(tau, dtype=float), -ax.Th_L, ax.Th_L)
+    hi = np.abs(t) / ax.Kp_L + math.pi / (2 * ax.Nr_L)
     lo = -hi
     for _ in range(iters):
         mid = 0.5 * (lo + hi)
-        turun = ax.Th * np.sin(ax.Nr * mid) + ax.Kp * mid < t
+        turun = ax.Th_L * np.sin(ax.Nr_L * mid) + ax.Kp_L * mid < t
         lo = np.where(turun, mid, lo)
         hi = np.where(turun, hi, mid)
     return 0.5 * (lo + hi)
@@ -87,9 +119,9 @@ def integrate(ax, cmd, tau, T, tau0=0.0, M=1, dt=1e-4, rec=10):
         e = thm - cm
         # Kejenuhan di Th berlaku untuk pegas magnet DAN loop driver: driver tidak bisa melebihi torsi tahan.
         # Kp = 0 membuat clip tidak aktif (|Th sin| <= Th), jadi identik dengan model loop terbuka lama.
-        tm = -np.clip(ax.Th * np.sin(ax.Nr * e) + ax.Kp * e, -ax.Th, ax.Th) - ax.bm * wm
+        tm = -np.clip(ax.Th_L * np.sin(ax.Nr_L * e) + ax.Kp_L * e, -ax.Th_L, ax.Th_L) - ax.bm * wm
         tsh = ax.k * (thm - tl) + c * (wm - wl)
-        return np.array([wm, (tm - tsh) / ax.Jm, wl, (tsh - ax.bl * wl - ax.fc * np.tanh(wl / 2e-3) - tw) / ax.JL])
+        return np.array([wm, (tm - tsh) / ax.Jm_L, wl, (tsh - ax.bl * wl - ax.fc * np.tanh(wl / 2e-3) - tw) / ax.JL])
 
     for i in range(n):
         t = i * dt
@@ -206,8 +238,15 @@ def self_check():
 # wind_node, osilasi_energi) ikut sendiri lewat Axis.K_ser().
 KP_NOM = 300.0
 
-AXES = {"elevasi": Axis(JL=0.0543, k=317.0, grav=1.274),
-        "azimuth": Axis(name="azimuth", k=1600.0, JL=0.1514, arm=0.152, grav=0.0)}
+# N = 1.0 di sini: AXES masih menggambarkan desain LAMA (penggerak langsung). Desain baru memakai
+# AXES_V2 di bawah. Dipisah supaya hasil lama tetap dapat dibandingkan.
+AXES = {"elevasi": Axis(JL=0.0543, k=317.0, grav=1.274, N=1.0),
+        "azimuth": Axis(name="azimuth", k=1600.0, JL=0.1514, arm=0.152, grav=0.0, N=1.0)}
+
+# Desain baru (desainbaru/, dibangun oleh build_model_v2.py): reduksi gigi 42/8 pada kemiringan,
+# panel lebih seimbang (gravitasi maks 0.884 N.m, pada q2=0 hanya 0.0088 N.m), J_el 0.0587.
+AXES_V2 = {"elevasi": Axis(JL=0.0587, k=317.0, grav=0.884, N=42 / 8),
+           "azimuth": Axis(name="azimuth", k=1600.0, JL=0.1514, arm=0.152, grav=0.0, N=1.0)}
 
 
 def md(rows, cols):

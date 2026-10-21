@@ -37,7 +37,7 @@ MESH_URI = "package://solar_tracker_v2/meshes"
 sys.path.insert(0, str(ROOT / "dinamika"))
 import dyn_model as D   # noqa: E402  (satu sumber konstanta stepper)
 
-GEAR_N = 42 / 8          # 5.25 : 1 reduksi pada sumbu KEMIRINGAN (azimuth tetap langsung)
+GEAR_N = D.AXES_V2["elevasi"].N   # 5.25 : 1 pada KEMIRINGAN; satu sumber di dyn_model.AXES_V2
 PANEL_KG = 2.55          # pelat nama MOS C-50-18-M
 MOTOR_KG = 1.2           # ASUMSI, dibawa dari model lama. 57HSE1.5N kemungkinan lebih ringan, perlu ditimbang.
 JOINT_DAMP, JOINT_FRIC = 0.2, 0.05   # ASUMSI, sama dengan model lama
@@ -88,7 +88,9 @@ def massa_part(nama, vol_cm3):
     return vol_cm3 * RHO["alu"]
 
 
-def muat_link(nama_link):
+def muat_link(nama_link, asal=None):
+    """asal = titik asal frame link (m, koordinat rakitan). Mesh dan COM digeser ke sana, karena di URDF
+    geometri visual dan <inertial><origin> diukur dari FRAME LINK, bukan dari frame rakitan."""
     """Gabungkan mesh satu link, kembalikan (mesh gabungan, massa, COM, tensor inersia di COM)."""
     meshes, M, Mc, parts = [], 0.0, np.zeros(3), []
     for n in LINK[nama_link]:
@@ -96,6 +98,8 @@ def muat_link(nama_link):
         if not f.exists():
             raise SystemExit(f"mesh hilang: {f}")
         m = ke_ros(trimesh.load(f, force="mesh"))
+        if asal is not None:
+            m.apply_translation(-np.asarray(asal, dtype=float))
         meshes.append(m)
         v = abs(m.volume) * 1e6          # m3 -> cm3
         kg = massa_part(n, v)
@@ -121,21 +125,25 @@ def inertial_xml(M, com, I):
 
 
 def gains():
-    """Gain Gazebo. Sumbu kemiringan memakai reduksi gigi: pegas magnet dirujuk ke beban naik N kuadrat,
-    langit-langit torsi di beban naik N kali."""
-    g = {}
-    for j, key, N in (("azimuth_joint", "azimuth", 1.0), ("elevation_joint", "elevasi", GEAR_N)):
-        ax = D.AXES[key]
-        Kmag = (ax.Th * ax.Nr + ax.Kp) * N * N
-        g[j] = dict(p=1 / (1 / Kmag + 1 / ax.k), cmd=ax.Th * N)
-    return g
+    """Gain Gazebo dari dyn_model.AXES_V2. Reduksi gigi sudah masuk lewat Axis.K_ser() dan Axis.Th_L,
+    jadi tidak ada rumus yang digandakan di sini."""
+    return {j: dict(p=ax.K_ser(), cmd=ax.Th_L)
+            for j, ax in (("azimuth_joint", D.AXES_V2["azimuth"]),
+                          ("elevation_joint", D.AXES_V2["elevasi"]))}
 
 
 def main():
     (OUT / "meshes").mkdir(parents=True, exist_ok=True)
+    # sumbu dari geometri, dihitung lebih dulu karena menjadi asal frame tiap link
+    poros = ke_ros(trimesh.load(SRC / "as_8mm_1.stl", force="mesh"))
+    z_el = float(poros.bounds.mean(axis=0)[2])          # tinggi poros engsel
+    alas = ke_ros(trimesh.load(SRC / "alas_1.stl", force="mesh"))
+    z_az = float(alas.bounds.mean(axis=0)[2])           # pelat dudukan putaran azimuth
+    ASAL = {"base": (0.0, 0.0, 0.0), "azimuth_link": (0.0, 0.0, z_az), "elevation_link": (0.0, 0.0, z_el)}
+
     info, L = {}, {}
     for nm in LINK:
-        mesh, M, com, I = muat_link(nm)
+        mesh, M, com, I = muat_link(nm, ASAL[nm])
         # Mesh CAD sangat rapat (sampai 318k segitiga, 27 MB). Hanya dipakai untuk TAMPILAN, bukan tabrakan
         # maupun inersia (massa, COM dan tensor sudah dihitung dari mesh penuh di atas), jadi aman disederhanakan.
         n0 = len(mesh.faces)
@@ -155,11 +163,6 @@ def main():
                         inersia_com_kgm2=dict(ixx=I[0, 0], iyy=I[1, 1], izz=I[2, 2],
                                               ixy=I[0, 1], ixz=I[0, 2], iyz=I[1, 2]))
 
-    # sumbu dari geometri
-    poros = ke_ros(trimesh.load(SRC / "as_8mm_1.stl", force="mesh"))
-    z_el = float(poros.bounds.mean(axis=0)[2])          # tinggi poros engsel
-    alas = ke_ros(trimesh.load(SRC / "alas_1.stl", force="mesh"))
-    z_az = float(alas.bounds.mean(axis=0)[2])           # pelat dudukan putaran azimuth
     print(f"\nsumbu azimuth   : Z di (x=0, y=0), origin z = {z_az:.4f} m")
     print(f"sumbu kemiringan: X di (y=0), origin z = {z_el:.4f} m  (selisih {z_el - z_az:+.4f} m)")
 
