@@ -33,10 +33,13 @@ ROOT = Path(__file__).resolve().parent.parent   # folder proyek (berisi sun.py d
 sys.path.insert(0, str(ROOT))
 import sun       # noqa: E402
 import tracker   # noqa: E402
+sys.path.insert(0, str(ROOT / "cuaca"))
+import hujan as HJ   # noqa: E402  (hujan NYATA Open-Meteo + kebijakan parkir datar)
 sys.path.insert(0, str(ROOT / "dinamika"))
 import dyn_model as D   # noqa: E402  (frekuensi dan redaman sumbu untuk input shaper)
 
 DEFAULTS = dict(date="2026-10-04", speed=600.0, enabled=True, okta=0.0, loop=True, q2max=45.0, az_rate=90.0, tilt_rate=90.0, marker=True, hour=-1.0, manual=False, gz_light=True,
+                parkir_hujan=True, hujan_ambang=HJ.AMBANG_MM, hujan_tahan=HJ.TAHAN_JAM,
                 az_accel=300.0, tilt_accel=300.0, shaper="zvd", pakai_ekf=False)
 RATE_HZ = 100.0   # laju tick: jeda shaper ZVD azimuth 104 ms = 10.4 cuplikan, galat pembulatan sekitar 4 persen (ZVD tahan sebesar ini)
 
@@ -224,6 +227,22 @@ def main():
                     return
             g = lambda k: float(np.interp(self.sim_t, tr["t"], tr[k]))
             tgt = [g("q1"), g("q2")]
+            # PARKIR DATAR SAAT HUJAN. Hanya kemiringan yang diratakan; azimuth dibiarkan di tempat
+            # supaya tidak ada gerakan sia-sia. Datar menang tipis saat mendung tebal (102.3 % dari
+            # menjejak pada okta 8), karena panel datar melihat seluruh kubah langit sedangkan panel
+            # miring melihat lebih sedikit, dan saat hujan hampir semua cahaya adalah baur.
+            self.hujan = False
+            if bool(self.p("parkir_hujan")):
+                try:
+                    jam = tr["hour0"] + self.sim_t / 3600.0      # jam lokal simulasi, sama dengan /sun/state[0]
+                    self.hujan = HJ.parkir(str(self.p("date")), jam,
+                                           float(self.p("hujan_ambang")), float(self.p("hujan_tahan")))
+                except Exception as e:   # data hujan tidak ada untuk tanggal itu: jangan jatuhkan node
+                    if not getattr(self, "_warn_hujan", False):
+                        self.get_logger().warning(f"data hujan tidak terbaca, parkir dimatikan: {e}")
+                        self._warn_hujan = True
+                if self.hujan:
+                    tgt[1] = math.radians(HJ.Q2_PARKIR)
             if self.p("pakai_ekf"):   # loop tertutup: perintah digeser melawan simpangan yang ditaksir EKF
                 tgt = [t - math.radians(k) for t, k in zip(tgt, self.ekf_kor)]
             # profil trapesium lalu input shaper: perintah mentah membuat ayunan sampai 137 deg saat lompat besar
