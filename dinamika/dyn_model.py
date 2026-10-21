@@ -242,12 +242,16 @@ KP_NOM = 300.0
 # AXES_V1 hanya untuk membandingkan hasil historis; tidak ada kode yang memakainya.
 #
 # Yang berubah terhadap desain lama:
-#   reduksi gigi 42/8 = 5.25 pada KEMIRINGAN (azimuth tetap penggerak langsung)
+#   reduksi gigi 30/6 = 5.00 pada KEMIRINGAN (azimuth tetap penggerak langsung).
+#     DIUKUR PENGGUNA di alat: 5 putaran pinion = 1 putaran gigi besar; diameter luar 22 dan 88 mm.
+#     Itu konsisten dengan modul 2.75, z1 = 6, z2 = 30 (OD = m(z+2): 2.75*8 = 22, 2.75*32 = 88;
+#     diameter jarak bagi 16.5 dan 82.5, rasionya tepat 5). Jarak sumbu 49.5 mm, terukur 50.2 di CAD.
+#     Nilai 42/8 = 5.25 yang sempat dipakai berasal dari mesh CAD dan SALAH: ia meramal pinion 20 mm.
 #   panel hampir seimbang: gravitasi maks 0.884 N.m, pada q2 = 0 hanya 0.0088 N.m (dulu 0.276)
 #   J_el 0.0543 -> 0.0587 kg.m2 (inersia dari mesh CAD baru)
 #   k kemiringan 317 -> 163.8 N.m/rad: poros as_8mm TERUKUR 194 mm di CAD, bukan 100 mm yang
 #     diasumsikan dulu. G J / L dengan baja 8 mm memberi 163.8.
-AXES = {"elevasi": Axis(JL=0.0587, k=163.8, grav=0.884, N=42 / 8),
+AXES = {"elevasi": Axis(JL=0.0587, k=163.8, grav=0.884, N=30 / 6),
         "azimuth": Axis(name="azimuth", k=1600.0, JL=0.1514, arm=0.152, grav=0.0, N=1.0)}
 
 # Desain LAMA, penggerak langsung, poros 100 mm. Arsip untuk perbandingan.

@@ -15,14 +15,14 @@
     <limit lower="-3.2289" upper="3.2289" effort="1.500" velocity="1"/></joint>
   <joint name="elevation_joint" type="revolute"><parent link="azimuth_link"/><child link="elevation_link"/>
     <origin xyz="0 0 0.0858"/><axis xyz="1 0 0"/><dynamics damping="0.2" friction="0.05"/>
-    <limit lower="-0.7854" upper="0.7854" effort="7.875" velocity="1"/></joint>
+    <limit lower="-0.7854" upper="0.7854" effort="7.500" velocity="1"/></joint>
   <gazebo>
     <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher"/>
     <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
       <joint_name>azimuth_joint</joint_name><p_gain>71.64</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>1.500</cmd_max><cmd_min>-1.500</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
-      <joint_name>elevation_joint</joint_name><p_gain>151.77</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>7.875</cmd_max><cmd_min>-7.875</cmd_min>
+      <joint_name>elevation_joint</joint_name><p_gain>150.64</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>7.500</cmd_max><cmd_min>-7.500</cmd_min>
     </plugin>
   </gazebo>
 </robot>

@@ -13,11 +13,13 @@ SUMBU, diturunkan dari geometri, bukan ditebak:
               (sama dengan konvensi model lama: panel berguling kanan-kiri, tidak jungkat-jungkit)
 
 REDUKSI GIGI, temuan terbesar desain ini. Model lama memakai penggerak langsung tanpa gearbox.
-  gear1 di poros motor elevasi (cz = -241.9), gear2 sektor di poros engsel (cz = -292.1)
-  jarak sumbu terukur 50.2 mm; modul 2 memberi z1 = 8, z2 = 42, jarak sumbu 50.0 mm,
-  OD2 = 88.0 mm berbanding 87.9 mm terukur, OD1 = 20.0 berbanding 19.5 terukur.
-  Tiga pemeriksaan bebas cocok  ->  RASIO = 42/8 = 5.25 : 1
-  gear2 adalah gigi SEKTOR (dy 87.9 tetapi dz 72.3), wajar untuk jangkauan +-45 derajat saja.
+  gear1 di poros motor elevasi (cz = -241.9), gear2 di poros engsel (cz = -292.1).
+  RASIO = 30/6 = 5.00 : 1, DIUKUR PENGGUNA di alat (5 putaran pinion = 1 putaran gigi besar),
+  dengan diameter luar 22 dan 88 mm. Modul 2.75: OD = m(z+2) memberi 2.75*8 = 22 dan 2.75*32 = 88;
+  diameter jarak bagi 16.5 dan 82.5 (rasio tepat 5). Jarak sumbu 49.5 mm, terukur 50.2 di CAD.
+  CATATAN: rasio 5.25 (modul 2, z 8/42) yang sempat diturunkan dari mesh SALAH, ia meramal pinion
+  20 mm padahal yang terpasang 22 mm. Dugaan "gigi sektor" juga salah: gigi besar LINGKARAN PENUH,
+  terbukti karena pinion bisa berputar 5 kali penuh terhadapnya.
 
 Jalankan: ~/.venvs/solar/bin/python build_model_v2.py
 Keluaran: solar_tracker_v2/{solar_tracker_v2.urdf, meshes/*.stl}
