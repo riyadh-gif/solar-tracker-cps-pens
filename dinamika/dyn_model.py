@@ -238,14 +238,20 @@ def self_check():
 # wind_node, osilasi_energi) ikut sendiri lewat Axis.K_ser().
 KP_NOM = 300.0
 
-# N = 1.0 di sini: AXES masih menggambarkan desain LAMA (penggerak langsung). Desain baru memakai
-# AXES_V2 di bawah. Dipisah supaya hasil lama tetap dapat dibandingkan.
-AXES = {"elevasi": Axis(JL=0.0543, k=317.0, grav=1.274, N=1.0),
+# AXES adalah DESAIN BARU (desainbaru/, dibangun build_model_v2.py). Desain lama disimpan sebagai
+# AXES_V1 hanya untuk membandingkan hasil historis; tidak ada kode yang memakainya.
+#
+# Yang berubah terhadap desain lama:
+#   reduksi gigi 42/8 = 5.25 pada KEMIRINGAN (azimuth tetap penggerak langsung)
+#   panel hampir seimbang: gravitasi maks 0.884 N.m, pada q2 = 0 hanya 0.0088 N.m (dulu 0.276)
+#   J_el 0.0543 -> 0.0587 kg.m2 (inersia dari mesh CAD baru)
+#   k kemiringan 317 -> 163.8 N.m/rad: poros as_8mm TERUKUR 194 mm di CAD, bukan 100 mm yang
+#     diasumsikan dulu. G J / L dengan baja 8 mm memberi 163.8.
+AXES = {"elevasi": Axis(JL=0.0587, k=163.8, grav=0.884, N=42 / 8),
         "azimuth": Axis(name="azimuth", k=1600.0, JL=0.1514, arm=0.152, grav=0.0, N=1.0)}
 
-# Desain baru (desainbaru/, dibangun oleh build_model_v2.py): reduksi gigi 42/8 pada kemiringan,
-# panel lebih seimbang (gravitasi maks 0.884 N.m, pada q2=0 hanya 0.0088 N.m), J_el 0.0587.
-AXES_V2 = {"elevasi": Axis(JL=0.0587, k=317.0, grav=0.884, N=42 / 8),
+# Desain LAMA, penggerak langsung, poros 100 mm. Arsip untuk perbandingan.
+AXES_V1 = {"elevasi": Axis(JL=0.0543, k=317.0, grav=1.274, N=1.0),
            "azimuth": Axis(name="azimuth", k=1600.0, JL=0.1514, arm=0.152, grav=0.0, N=1.0)}
 
 

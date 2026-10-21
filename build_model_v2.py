@@ -37,12 +37,17 @@ MESH_URI = "package://solar_tracker_v2/meshes"
 sys.path.insert(0, str(ROOT / "dinamika"))
 import dyn_model as D   # noqa: E402  (satu sumber konstanta stepper)
 
-GEAR_N = D.AXES_V2["elevasi"].N   # 5.25 : 1 pada KEMIRINGAN; satu sumber di dyn_model.AXES_V2
+GEAR_N = D.AXES["elevasi"].N   # 5.25 : 1 pada KEMIRINGAN; satu sumber di dyn_model.AXES_V2
 PANEL_KG = 2.55          # pelat nama MOS C-50-18-M
 MOTOR_KG = 1.2           # ASUMSI, dibawa dari model lama. 57HSE1.5N kemungkinan lebih ringan, perlu ditimbang.
 JOINT_DAMP, JOINT_FRIC = 0.2, 0.05   # ASUMSI, sama dengan model lama
 EL_LIMIT = math.radians(45)          # ASUMSI, belum diukur
-AZ_LIMIT = math.radians(170)         # BARU: azimuth tidak lagi kontinu (ada pangkon_limit + 4 saklar)
+AZ_LIMIT = math.radians(185)         # BARU: azimuth tidak lagi kontinu (ada pangkon_limit + 4 saklar).
+#                                      ASUMSI, menunggu angka asli dari CAD. 185 dipilih karena matahari PENS
+#                                      sepanjang 2026 menuntut q1 dari -180.9 sampai +174.6 deg. Nilai +-170
+#                                      yang dipakai semula membuat tracker MENTOK dan berhenti mengikuti
+#                                      matahari (terbukti di Gazebo: sendi terkunci -170 saat perintah -178.9),
+#                                      dan +-180 pun masih kurang tipis.
 
 MAX_TRI = 40000        # batas segitiga mesh TAMPILAN; inersia tetap dari mesh penuh
 RHO = {"baja": 7.85e-3, "alu": 2.70e-3, "plastik": 1.20e-3}   # kg/cm3
@@ -128,8 +133,8 @@ def gains():
     """Gain Gazebo dari dyn_model.AXES_V2. Reduksi gigi sudah masuk lewat Axis.K_ser() dan Axis.Th_L,
     jadi tidak ada rumus yang digandakan di sini."""
     return {j: dict(p=ax.K_ser(), cmd=ax.Th_L)
-            for j, ax in (("azimuth_joint", D.AXES_V2["azimuth"]),
-                          ("elevation_joint", D.AXES_V2["elevasi"]))}
+            for j, ax in (("azimuth_joint", D.AXES["azimuth"]),
+                          ("elevation_joint", D.AXES["elevasi"]))}
 
 
 def main():

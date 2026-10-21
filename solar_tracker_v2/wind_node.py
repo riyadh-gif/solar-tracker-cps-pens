@@ -54,9 +54,10 @@ def selftest():
     for nm, ax in D.AXES.items():
         assert abs(delta_cmd(ax, kseri(ax)) - 1.0) < 1e-12
     # nilai yang dipakai build_model.stiffness_gains. Tripwire: SENGAJA dipatok supaya perubahan Th, k atau Kp gagal berisik.
-    # Riwayat: loop terbuka Th=3.0 -> 137.14 / 101.82; loop terbuka Th=1.5 (57HSE1.5N) -> 71.64 / 60.65.
-    # Saat Kp dinyalakan nanti, assert ini WAJIB gagal: itu memang gunanya.
-    assert abs(kseri(D.AXES["azimuth"]) - 71.64) < 0.01 and abs(kseri(D.AXES["elevasi"]) - 60.65) < 0.01
+    # Riwayat: Th=3.0 penggerak langsung -> 137.14 / 101.82; Th=1.5 penggerak langsung -> 71.64 / 60.65;
+    # DESAIN BARU (reduksi 5.25 pada kemiringan, poros 194 mm) -> 71.64 / 151.77.
+    # Saat Kp atau N diubah, assert ini WAJIB gagal: itu memang gunanya.
+    assert abs(kseri(D.AXES["azimuth"]) - 71.64) < 0.01 and abs(kseri(D.AXES["elevasi"]) - 151.77) < 0.01
     print("selftest wind_node: lolos")
 
 

@@ -54,10 +54,30 @@ def stepper_torque(delta, ax):
     return 0.5 * (lo + hi)
 
 
+def sumbu_sah(ax):
+    """Model torsi-sudut ini hanya SAH bila poros lebih kaku daripada pegas magnet yang dirujuk ke beban.
+
+    Syaratnya k > Th_L * Nr_L. Dengan penggerak langsung (N = 1) itu 317 > 75, aman. Dengan reduksi
+    gigi, pegas magnet yang dirujuk ke beban naik N kuadrat: pada kemiringan desain baru menjadi
+    1.5*5.25 * 50*5.25 = 2067 N.m/rad melawan poros 163.8, sehingga syaratnya GAGAL.
+
+    Akibatnya kurva torsi kuasi-statis menjadi BERNILAI GANDA (ada snap-through) dan bisection di
+    stepper_torque tidak lagi menemukan cabang yang benar. Ini keterbatasan model, bukan keterbatasan
+    alat: alat nyata memang bisa snap, dan memodelkannya butuh pelacakan cabang dengan histeresis.
+
+    Mode aktuator `pid` TIDAK terpengaruh: ia memakai K_ser linier dan itulah yang dipakai seluruh
+    validasi Gazebo sejauh ini.
+    """
+    return ax.k > ax.Th_L * ax.Nr_L
+
+
 def selftest():
-    """Tanpa ROS: sifat model torsi."""
+    """Tanpa ROS: sifat model torsi. Sumbu bergigi dilewati, lihat sumbu_sah()."""
     for nm, ax in D.AXES.items():
-        assert ax.k > ax.Th * ax.Nr, f"k {nm} harus > Th Nr agar model unik"
+        if not sumbu_sah(ax):
+            print(f"  ({nm} DILEWATI: k={ax.k:.1f} < Th_L*Nr_L={ax.Th_L * ax.Nr_L:.0f}, "
+                  f"reduksi N={ax.N:.2f} membuat torsi bernilai ganda; pakai aktuator pid)")
+            continue
         s0 = stepper_torque(0.0, ax)
         assert abs(s0) < 1e-9
         # defleksi kecil: tau ~ K_seri * delta, K_seri = 1/(1/(Th Nr) + 1/k)
@@ -113,6 +133,11 @@ def main():
             self.create_subscription(JointState, "/joint_states", self.on_js, 1)
             self.dt = 1 / 200.0
             self.create_timer(self.dt, self.tick)
+            buruk = [nm for nm, ax in self.ax.items() if not sumbu_sah(ax)]
+            if buruk:
+                self.get_logger().error(
+                    f"sumbu {buruk} memakai reduksi gigi sehingga k < Th_L*Nr_L: kurva torsi BERNILAI GANDA "
+                    f"dan hasil node ini TIDAK SAH untuk sumbu itu. Pakai aktuator pid. Lihat sumbu_sah().")
             self.get_logger().info("stepper_node siap (rotor tak bermassa, torsi-sudut sinus, loop terbuka)")
 
         def p(self, k):
