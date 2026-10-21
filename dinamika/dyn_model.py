@@ -228,14 +228,23 @@ def self_check():
 # KP_NOM = 300 dipilih sebagai nilai terkaku yang masih menyisakan jangkauan linier sekitar dua
 # microstep, yaitu syarat minimum agar loop posisi punya arti di antara langkah. Ganti begitu
 # datasheet tiba. Kp = 0 mengembalikan seluruh perilaku loop terbuka.
-# BELUM DIPAKAI. AXES di bawah masih Kp=0 (loop terbuka) sampai dua hal selesai:
-#   1. datasheet 57HSE1.5N memberi penguatan posisi driver yang sebenarnya;
-#   2. pertanyaan kejenuhan di atas terjawab, yaitu pada amplitudo kerja (satu microstep) apakah
-#      driver tetap linier. ODE di osilasi_energi.py TIDAK setuju dengan prediksi kecil-sinyal
-#      pada Kp = 300 (mengukur 5,92 Hz, prediksi 7,13 Hz), yang menandakan torsi jenuh saat
-#      transien. Selama itu belum dipahami, menyetel Kp hanya memindahkan galat.
-# Menutup loop = ganti Kp=0 menjadi Kp=KP_NOM di AXES. Seluruh rantai (gain Gazebo, shaper ZVD,
-# wind_node, osilasi_energi) ikut sendiri lewat Axis.K_ser().
+# DIPAKAI. Stepper memang LOOP TERTUTUP (dikonfirmasi pengguna), jadi AXES di bawah memakai Kp=KP_NOM.
+#
+# Pemilihan nilai dibatasi KEJENUHAN, bukan oleh keinginan kaku. Torsi driver tetap dibatasi Th, jadi
+# kekakuan kecil-sinyal hanya terwujud selama simpangan rotor di bawah e_jenuh = Th / (Th Nr + Kp):
+#     Kp     e_jenuh di motor    terhadap microstep 0.1125 deg
+#       0        1.1459 deg           10.2 x
+#     300        0.2292 deg            2.0 x   <- KP_NOM
+#    1000        0.0799 deg            0.7 x   jenuh dalam satu microstep
+#     1e9        0.0000 deg            0.0 x   TIDAK FISIS
+# KP_NOM = 300 adalah nilai terkaku yang masih menyisakan sekitar dua microstep jangkauan linier.
+#
+# SEBERAPA PENTING NILAI INI, dan jawabannya tidak simetris:
+#   kemiringan (bergigi 5:1): f_n hanya 8.06 .. 8.41 Hz untuk Kp = 0 sampai tak hingga, sebaran 4.3 %.
+#       Reduksi menaikkan pegas magnet yang dirujuk ke beban ke 1875 N.m/rad ke atas, jauh melewati
+#       poros 163.8, sehingga POROS yang menentukan dan penguatan driver hampir tidak berpengaruh.
+#   azimuth (penggerak langsung): f_n 3.46 .. 16.36 Hz, sebaran 373 %. Di sini nilai Kp menentukan
+#       segalanya dan datasheet driver masih DIBUTUHKAN.
 KP_NOM = 300.0
 
 # AXES adalah DESAIN BARU (desainbaru/, dibangun build_model_v2.py). Desain lama disimpan sebagai
@@ -251,8 +260,8 @@ KP_NOM = 300.0
 #   J_el 0.0543 -> 0.0587 kg.m2 (inersia dari mesh CAD baru)
 #   k kemiringan 317 -> 163.8 N.m/rad: poros as_8mm TERUKUR 194 mm di CAD, bukan 100 mm yang
 #     diasumsikan dulu. G J / L dengan baja 8 mm memberi 163.8.
-AXES = {"elevasi": Axis(JL=0.0587, k=163.8, grav=0.884, N=30 / 6),
-        "azimuth": Axis(name="azimuth", k=1600.0, JL=0.1514, arm=0.152, grav=0.0, N=1.0)}
+AXES = {"elevasi": Axis(JL=0.0587, k=163.8, grav=0.884, N=30 / 6, Kp=KP_NOM),
+        "azimuth": Axis(name="azimuth", k=1600.0, JL=0.1514, arm=0.152, grav=0.0, N=1.0, Kp=KP_NOM)}
 
 # Desain LAMA, penggerak langsung, poros 100 mm. Arsip untuk perbandingan.
 AXES_V1 = {"elevasi": Axis(JL=0.0543, k=317.0, grav=1.274, N=1.0),

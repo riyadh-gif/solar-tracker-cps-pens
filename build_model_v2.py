@@ -131,12 +131,32 @@ def inertial_xml(M, com, I):
             f'ixy="{I[0,1]:.6g}" ixz="{I[0,2]:.6g}" iyz="{I[1,2]:.6g}"/></inertial>')
 
 
+ZETA_DRIVER = 0.0      # redaman loop posisi driver. 0 = tidak dimodelkan; lihat catatan di gains().
+
+
 def gains():
-    """Gain Gazebo dari dyn_model.AXES_V2. Reduksi gigi sudah masuk lewat Axis.K_ser() dan Axis.Th_L,
-    jadi tidak ada rumus yang digandakan di sini."""
-    return {j: dict(p=ax.K_ser(), cmd=ax.Th_L)
-            for j, ax in (("azimuth_joint", D.AXES["azimuth"]),
-                          ("elevation_joint", D.AXES["elevasi"]))}
+    """Gain Gazebo dari dyn_model.AXES. Reduksi gigi sudah masuk lewat Axis.K_ser() dan Axis.Th_L,
+    jadi tidak ada rumus yang digandakan di sini.
+
+    d_gain DIBIARKAN NOL. Driver loop tertutup yang sebenarnya hampir pasti punya umpan balik
+    kecepatan, tetapi nilainya belum diketahui dan simulasi TIDAK membutuhkannya untuk stabil.
+    Diuji langsung di Gazebo, satu peluncuran bersih, perintah az 0.5 el 0.6 rad:
+        d_gain = 0.000  -> diam di 1.2e-17 rad, lalu menetap di 0.5000184 dan 0.6043358
+        d_gain = 3.869  -> diam di 1.5e-17 rad, lalu menetap di 0.5000071 dan 0.6045875
+    Keduanya stabil dan sama telitinya, jadi menambah d_gain hanya menambah satu asumsi tanpa
+    manfaat yang terbukti. Naikkan ZETA_DRIVER hanya bila datasheet memberi angkanya.
+
+    (Catatan kejujuran: sempat ada dugaan bahwa d_gain taknol WAJIB karena sendi terlihat
+    mengembara sampai batas. Itu salah. Penyebab sebenarnya adalah empat wind_node dan dua
+    sun_command_node sisa peluncuran sebelumnya yang menerbitkan perintah saling menimpa ke
+    topik yang sama. Setelah proses sisa dibersihkan, d_gain = 0 berperilaku sempurna.)
+    """
+    g = {}
+    for j, ax in (("azimuth_joint", D.AXES["azimuth"]), ("elevation_joint", D.AXES["elevasi"])):
+        K = ax.K_ser()
+        d = max(0.0, 2 * ZETA_DRIVER * math.sqrt(K * ax.JL) - ax.bl)   # dikurangi redaman sendi yang sudah ada
+        g[j] = dict(p=K, d=d, cmd=ax.Th_L)
+    return g
 
 
 def main():
@@ -176,7 +196,7 @@ def main():
     g = gains()
     ctl = "".join(
         f'    <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">\n'
-        f'      <joint_name>{j}</joint_name><p_gain>{g[j]["p"]:.2f}</p_gain><i_gain>0</i_gain><d_gain>0</d_gain>'
+        f'      <joint_name>{j}</joint_name><p_gain>{g[j]["p"]:.2f}</p_gain><i_gain>0</i_gain><d_gain>{g[j]["d"]:.3f}</d_gain>'
         f'<cmd_max>{g[j]["cmd"]:.3f}</cmd_max><cmd_min>-{g[j]["cmd"]:.3f}</cmd_min>\n    </plugin>\n'
         for j in ("azimuth_joint", "elevation_joint"))
 
@@ -211,7 +231,7 @@ def main():
 
     print(f"\ngain Gazebo (reduksi {GEAR_N:.2f}:1 di kemiringan):")
     for j in ("azimuth_joint", "elevation_joint"):
-        print(f"  {j:<17} p_gain={g[j]['p']:8.2f}  cmd_max={g[j]['cmd']:.3f} N.m")
+        print(f"  {j:<17} p_gain={g[j]['p']:8.2f}  d_gain={g[j]['d']:6.3f}  cmd_max={g[j]['cmd']:.3f} N.m")
     print(f"\nditulis: {OUT/'solar_tracker_v2.urdf'}")
 
 

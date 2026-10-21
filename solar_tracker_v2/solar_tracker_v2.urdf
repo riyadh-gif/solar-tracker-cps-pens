@@ -19,10 +19,10 @@
   <gazebo>
     <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher"/>
     <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
-      <joint_name>azimuth_joint</joint_name><p_gain>71.64</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>1.500</cmd_max><cmd_min>-1.500</cmd_min>
+      <joint_name>azimuth_joint</joint_name><p_gain>303.80</p_gain><i_gain>0</i_gain><d_gain>0.000</d_gain><cmd_max>1.500</cmd_max><cmd_min>-1.500</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
-      <joint_name>elevation_joint</joint_name><p_gain>150.64</p_gain><i_gain>0</i_gain><d_gain>0</d_gain><cmd_max>7.500</cmd_max><cmd_min>-7.500</cmd_min>
+      <joint_name>elevation_joint</joint_name><p_gain>160.99</p_gain><i_gain>0</i_gain><d_gain>0.000</d_gain><cmd_max>7.500</cmd_max><cmd_min>-7.500</cmd_min>
     </plugin>
   </gazebo>
 </robot>
