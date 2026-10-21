@@ -32,7 +32,7 @@ def page():
     ulang node. Dulu dibaca sekali saat impor, dan itu membuat suntingan tampak tidak berpengaruh."""
     return HTML.read_text(encoding="utf-8")
 Q = queue.Queue()
-S = dict(mode="auto", run=True, hour=12.0, doy=277, q1=0.0, q2=0.0)   # keadaan kontrol (dibaca halaman)
+S = dict(mode="auto", run=True, hour=12.0, doy=277, q1=0.0, q2=0.0, hujan_mode="auto")   # keadaan kontrol (dibaca halaman)
 AREA, EFF, ALB = 0.670 * 0.445, 50.0 / (0.670 * 0.445 * 1000.0), 0.25   # MOS C-50-18-M: luas 0.2982 m2, efisiensi = Pmax 50 W / (luas x 1000 W/m2) = 16.8%, albedo (sama dengan sun.poa)
 E = dict(wh=0.0, flat=0.0, ideal=0.0, last_h=None, last_doy=277, log=[], t_log=0.0)   # energi terkumpul (Wh) hari ini
 
@@ -60,6 +60,8 @@ def apply(node, name, v):
         sun("speed", float(v))
     elif name == "okta":
         sun("okta", float(v))
+    elif name == "hujan_mode":
+        S["hujan_mode"] = str(v); sun("hujan_mode", str(v))
     elif name in ("q1", "q2"):
         S[name] = float(v)
     elif name == "zero":
@@ -145,6 +147,10 @@ def state(node):
         d["diag"] = node.diag
     if node.ekf:         # ekf_node: taksiran simpangan sudut dan ketidakpastiannya
         d["ekf"] = node.ekf
+    if node.hujan:       # sun_command_node: satu sumber kebenaran untuk hujan
+        h = node.hujan
+        d.update(hujan_basah=h[0] > 0.5, hujan_mm=round(h[1], 2),
+                 hujan_mode=["auto", "on", "off"][int(h[2]) if int(h[2]) in (0, 1, 2) else 0])
     return d
 
 

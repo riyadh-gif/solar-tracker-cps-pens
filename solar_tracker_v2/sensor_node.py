@@ -38,8 +38,7 @@ sys.path.insert(0, str(ROOT / "cuaca"))
 import hujan as HJ   # noqa: E402  (hujan NYATA untuk menandai kaca basah)
 import tracker               # noqa: E402
 
-DEFAULTS = dict(enabled=True, mism=0.03, kalibrasi=False, tamb=30.0, albedo=0.25, seed=0,
-                tanggal="2026-10-04", hujan_auto=True)
+DEFAULTS = dict(enabled=True, mism=0.03, kalibrasi=False, tamb=30.0, albedo=0.25, seed=0)
 HZ = 5.0
 
 
@@ -178,6 +177,7 @@ def main():
             self.buf = deque(maxlen=4000)      # (t, q1, q2) sekitar 4 detik terakhir
             self.create_subscription(JointState, "/joint_states", self.on_js, 4000)
             self.create_subscription(Float64MultiArray, "/sun/state", lambda m: setattr(self, "sun", list(m.data)), 10)
+            self.create_subscription(Float64MultiArray, "/hujan/state", lambda m: setattr(self, "hujan", list(m.data)), 10)
             self.pub = self.create_publisher(String, "/tracker/diag", 10)
             self.pub_ldr = self.create_publisher(Float64MultiArray, "/ldr/state", 10)
             self.create_timer(1.0 / HZ, self.tick)
@@ -206,13 +206,9 @@ def main():
             jam, az, el, ghi, dni, dhi, c1, c2 = s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]
             tamb, alb = float(self.p_("tamb")), float(self.p_("albedo"))
             b1, b2 = self.load
-            # kaca BASAH bila hujan nyata sedang turun pada jam simulasi ini
-            basah = False
-            if bool(self.p_("hujan_auto")):
-                try:
-                    basah = HJ.parkir(str(self.p_("tanggal")), jam)
-                except Exception:
-                    basah = False
+            # kaca BASAH: diputuskan sun_command_node dan disiarkan di /hujan/state, supaya
+            # tidak ada dua sumber tanggal yang bisa berbeda diam-diam.
+            basah = bool(getattr(self, "hujan", [0.0])[0] > 0.5) if getattr(self, "hujan", None) else False
             # energi: integrasi terhadap JAM SIMULASI, hanya saat waktu maju (sama dengan control_web)
             if self.jam_lalu is not None and 0 < jam - self.jam_lalu < 0.25:
                 dh = jam - self.jam_lalu

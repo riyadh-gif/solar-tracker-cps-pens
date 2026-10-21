@@ -39,6 +39,18 @@ button:hover{border-color:var(--acc)}.seg{display:flex;gap:8px;flex-wrap:wrap}
 <div class="row"><label>Tutupan awan (okta 0..8)</label><input id="okta" type="range" min="0" max="8" step="1" value="0"><output id="okta_o">0</output></div>
 <div class="note">Menggeser jam membekukan waktu. Kecepatan = detik simulasi per detik nyata.</div></section>
 
+<section><h2>2b. Hujan (data nyata Open-Meteo)</h2>
+<div class="seg">
+<label><input type="radio" name="hujan" value="auto" checked><span>Otomatis: ikuti Open-Meteo</span></label>
+<label><input type="radio" name="hujan" value="on"><span>Paksa hujan</span></label>
+<label><input type="radio" name="hujan" value="off"><span>Paksa kering</span></label></div>
+<div class="row"><label>Keadaan sekarang</label><output id="hj_stat">-</output></div>
+<div class="row"><label>Presipitasi pada jam ini</label><output id="hj_mm">-</output></div>
+<div class="note">Mode <b>Otomatis</b> membaca presipitasi NYATA untuk tanggal dan jam yang sedang dipakai, jadi
+geser tanggal atau jam di atas untuk mencari hujan. Saat hujan panel PARKIR DATAR (kemiringan nol), kaca
+dihitung basah (transmisi 0,968) dan sel didinginkan ke suhu udara. Paksa hujan dan paksa kering
+mengesampingkan data, berguna untuk membandingkan langsung tanpa menunggu.</div></section>
+
 <section id="manual"><h2>3. Sendi manual</h2>
 <div class="row"><label>Azimuth q1 (deg, CW; arah miring = q1 + 90 dari Utara)</label><input id="q1" type="range" min="-200" max="200" step="0.5" value="0"><output id="q1_o">0</output></div>
 <div class="row"><label>Kemiringan q2 (deg, 0 = datar)</label><input id="q2" type="range" min="-45" max="45" step="0.5" value="0"><output id="q2_o">0</output></div>
@@ -134,6 +146,7 @@ button:hover{border-color:var(--acc)}.seg{display:flex;gap:8px;flex-wrap:wrap}
 const $=id=>document.getElementById(id);let drag={},last={};
 const post=(name,value)=>fetch('/set',{method:'POST',body:JSON.stringify({name,value})}).catch(()=>{});
 const thr={};function send(name,value,ms=120){const t=Date.now();if(!thr[name]||t-thr[name]>ms){thr[name]=t;post(name,value)}}
+document.querySelectorAll('input[name=hujan]').forEach(r=>r.addEventListener('change',()=>post('hujan_mode',r.value)));
 function bindRange(id,name,fmt,live=true){const e=$(id),o=$(id+'_o');e.addEventListener('input',()=>{drag[id]=1;o.textContent=fmt(e.value);if(live)send(name,+e.value)});
  e.addEventListener('change',()=>{post(name,+e.value);setTimeout(()=>delete drag[id],400)});}
 bindRange('doy','doy',v=>v+' ('+new Date(Date.UTC(2026,0,+v)).toISOString().slice(0,10)+')',false);
@@ -159,6 +172,11 @@ async function tick(){
   if(!drag.doy){$('doy').value=s.doy;$('doy_o').textContent=s.doy+' ('+s.date+')'}
   if(!drag.hour){$('hour').value=s.hour;$('hour_o').textContent=f(s.hour,2)}
   $('run').checked=s.run;
+  if(s.hujan_mode){const rb=document.querySelector('input[name=hujan][value='+s.hujan_mode+']');if(rb)rb.checked=true}
+  if(s.hujan_basah!==undefined){
+    $('hj_stat').textContent=s.hujan_basah?'HUJAN, panel parkir datar':'kering, panel menjejak';
+    $('hj_stat').style.color=s.hujan_basah?'var(--wr)':'var(--tx)';
+    $('hj_mm').textContent=f(s.hujan_mm,2)+' mm/jam';}
   if(!drag.q1&&s.mode==='manual'){$('q1').value=s.q1;$('q1_o').textContent=f(s.q1)}
   if(!drag.q2&&s.mode==='manual'){$('q2').value=s.q2;$('q2_o').textContent=f(s.q2)}
   if(s.ok_sun){$('r_t').textContent=s.date+'  '+s.jam+' WIB';$('r_sun').textContent='az '+f(s.az)+'  el '+f(s.el)+' deg';

@@ -39,7 +39,7 @@ sys.path.insert(0, str(ROOT / "dinamika"))
 import dyn_model as D   # noqa: E402  (frekuensi dan redaman sumbu untuk input shaper)
 
 DEFAULTS = dict(date="2026-10-04", speed=600.0, enabled=True, okta=0.0, loop=True, q2max=45.0, az_rate=90.0, tilt_rate=90.0, marker=True, hour=-1.0, manual=False, gz_light=True,
-                parkir_hujan=True, hujan_ambang=HJ.AMBANG_MM, hujan_tahan=HJ.TAHAN_JAM,
+                hujan_mode="auto", hujan_ambang=HJ.AMBANG_MM, hujan_tahan=HJ.TAHAN_JAM,
                 az_accel=300.0, tilt_accel=300.0, shaper="zvd", pakai_ekf=False)
 RATE_HZ = 100.0   # laju tick: jeda shaper ZVD azimuth 104 ms = 10.4 cuplikan, galat pembulatan sekitar 4 persen (ZVD tahan sebesar ini)
 
@@ -150,6 +150,10 @@ def main():
             self.pub_el = self.create_publisher(Float64, "/solar_tracker/elevation_cmd", 10)
             self.pub_state = self.create_publisher(Float64MultiArray, "/sun/state", 10)
             self.pub_marker = self.create_publisher(Marker, "/sun_marker", 10)
+            # SATU sumber kebenaran untuk hujan: node ini memutuskan, node lain berlangganan.
+            # Dulu sensor_node punya parameter tanggal sendiri, dan itu sempat membuat deteksi
+            # hujan di kedua node tidak sejalan tanpa pesan galat apa pun.
+            self.pub_hujan = self.create_publisher(Float64MultiArray, "/hujan/state", 10)
             self.ekf_kor = [0.0, 0.0]   # taksiran simpangan dari ekf_node; dipakai HANYA bila pakai_ekf true
             self.create_subscription(Float64MultiArray, "/ekf/koreksi",
                                      lambda m: setattr(self, "ekf_kor", list(m.data)[:2]), 10)
@@ -231,18 +235,21 @@ def main():
             # supaya tidak ada gerakan sia-sia. Datar menang tipis saat mendung tebal (102.3 % dari
             # menjejak pada okta 8), karena panel datar melihat seluruh kubah langit sedangkan panel
             # miring melihat lebih sedikit, dan saat hujan hampir semua cahaya adalah baur.
-            self.hujan = False
-            if bool(self.p("parkir_hujan")):
-                try:
-                    jam = tr["hour0"] + self.sim_t / 3600.0      # jam lokal simulasi, sama dengan /sun/state[0]
-                    self.hujan = HJ.parkir(str(self.p("date")), jam,
-                                           float(self.p("hujan_ambang")), float(self.p("hujan_tahan")))
-                except Exception as e:   # data hujan tidak ada untuk tanggal itu: jangan jatuhkan node
-                    if not getattr(self, "_warn_hujan", False):
-                        self.get_logger().warning(f"data hujan tidak terbaca, parkir dimatikan: {e}")
-                        self._warn_hujan = True
-                if self.hujan:
-                    tgt[1] = math.radians(HJ.Q2_PARKIR)
+            jam_sim = tr["hour0"] + self.sim_t / 3600.0   # jam lokal simulasi, sama dengan /sun/state[0]
+            mode = str(self.p("hujan_mode")).lower()
+            self.hujan, self.hujan_mm = False, 0.0
+            try:
+                self.hujan_mm = HJ.mm_pada(str(self.p("date")), jam_sim)
+                auto = HJ.parkir(str(self.p("date")), jam_sim,
+                                 float(self.p("hujan_ambang")), float(self.p("hujan_tahan")))
+            except Exception as e:       # data hujan tidak ada untuk tanggal itu: jangan jatuhkan node
+                auto = False
+                if not getattr(self, "_warn_hujan", False):
+                    self.get_logger().warning(f"data hujan tidak terbaca, mode auto jadi kering: {e}")
+                    self._warn_hujan = True
+            self.hujan = auto if mode == "auto" else (mode == "on")
+            if self.hujan:
+                tgt[1] = math.radians(HJ.Q2_PARKIR)
             if self.p("pakai_ekf"):   # loop tertutup: perintah digeser melawan simpangan yang ditaksir EKF
                 tgt = [t - math.radians(k) for t, k in zip(tgt, self.ekf_kor)]
             # profil trapesium lalu input shaper: perintah mentah membuat ayunan sampai 137 deg saat lompat besar
@@ -259,6 +266,10 @@ def main():
             az, el = g("az"), g("el")
             st = Float64MultiArray()
             st.data = [tr["hour0"] + self.sim_t / 3600, az, el, g("ghi"), g("dni"), g("dhi"), math.degrees(self.prev[0]), math.degrees(self.prev[1])]
+            hj = Float64MultiArray()   # [basah 0/1, mm/jam, kode mode: 0 auto, 1 on, 2 off]
+            hj.data = [1.0 if self.hujan else 0.0, float(getattr(self, "hujan_mm", 0.0)),
+                       {"auto": 0.0, "on": 1.0, "off": 2.0}.get(str(self.p("hujan_mode")).lower(), 0.0)]
+            self.pub_hujan.publish(hj)
             self.pub_state.publish(st)
             if self.p("gz_light") and self.n % 50 == 0:
                 self.light_req = (light_request(az, el), ball_request(az, el))   # thread worker mengirim yang terbaru saja

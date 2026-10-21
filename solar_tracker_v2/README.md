@@ -78,6 +78,11 @@ ros2 launch solar_tracker_v2/launch/sim_v2.launch.py \
     date:=2026-10-07 speed:=600 kalibrasi:=true
 ```
 
+**Hujan dikendalikan dari panel, bukan dari baris perintah.** Jalankan dengan `panel:=true`, buka
+`http://localhost:8765`, lalu pakai bagian **2b. Hujan**: Otomatis (ikut Open-Meteo), Paksa hujan, atau
+Paksa kering. Berlaku seketika, tanpa peluncuran ulang. Geser tanggal dan jam di bagian 2 untuk mencari
+hujan sungguhan. Argumen `date` hanya menentukan tanggal AWAL.
+
 **Hari hujan, untuk melihat parkir datar bekerja:**
 ```bash
 ros2 launch solar_tracker_v2/launch/sim_v2.launch.py \

@@ -43,6 +43,8 @@ class Panel(Node):
         self.create_subscription(_Str, "/tracker/diag", lambda m: setattr(self, "diag", _json.loads(m.data)), 10)
         self.ekf = None
         self.create_subscription(_Str, "/ekf/state", lambda m: setattr(self, "ekf", _json.loads(m.data)), 10)
+        self.hujan = None     # [basah 0/1, mm/jam, kode mode] dari sun_command_node
+        self.create_subscription(Float64MultiArray, "/hujan/state", lambda m: setattr(self, "hujan", list(m.data)), 10)
 
     def on_stp(self, m):
         self.stp, self.stp_t = list(m.data), time.time()
