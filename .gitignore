@@ -33,6 +33,8 @@ Thumbs.db
 
 # berkas kerja sementara
 .fase*.py
+.n*.py
+.fx*.py
 .fix.py
 
 # hasil ekstrak desain baru (bisa dibuat ulang dari .rar, 28 MB)
