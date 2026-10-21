@@ -43,17 +43,26 @@ mengikuti kerangka \emph{Solar Tracking Systems and Cyber-Physical Systems}, tet
 berasal dari CAD alat, pelat nama komponen, data cuaca terukur, atau simulasi multi-benda yang tervalidasi.
 Setiap persamaan diberi nama modelnya dan setiap asumsi diberi tanda eksplisit.
 
-Perbedaan paling menentukan dengan kerangka rujukan: kerangka itu mengandaikan aktuator servo bertorsi
-dengan enkoder kuadratur, sedangkan alat ini memakai \textbf{motor stepper loop terbuka tanpa enkoder}.
-Akibatnya \emph{Computed Torque Control} dan \emph{Sliding Mode Control} tidak dapat diterapkan apa adanya;
-penggantinya adalah umpan maju astronomis, pembentuk perintah \emph{input shaper} ZVD, dan tapis Kalman
-diperluas yang berperan sebagai pengganti enkoder.
+Alat yang dimodelkan memakai \textbf{motor stepper loop tertutup 57HSE1.5N} ($T_h = 1{,}5$~N\,m) dengan
+enkoder di poros rotor, dan \textbf{reduksi gigi $5{,}0{:}1$ pada sumbu kemiringan} (pinion 6 gigi, gigi
+besar 30, modul $2{,}75$; rasio diukur langsung di alat). Sumbu azimuth tetap penggerak langsung.
 
-Hasil utama yang terukur: frekuensi alami sumbu azimuth $4{,}79$~Hz (prediksi nilai eigen) berbanding
-$5{,}19$~Hz (Gazebo); lewatan langkah satu derajat $93{,}3\%$ (teori) berbanding $90\%$ (Gazebo); peredam
-ZVD menekan lewatan terburuk dari $19{,}35\degg$ menjadi $2{,}30\degg$; tapis Kalman dengan LDR terkalibrasi
-menurunkan galat pointing dari $2{,}52\degg$ menjadi $0{,}18\degg$; beban angin terburuk sebelas tahun hanya
-memakai $9{,}2\%$ torsi tahan motor.
+Perbedaan dengan kerangka rujukan tetap ada tetapi alasannya bergeser. Kerangka itu mengandaikan servo
+bertorsi dengan enkoder yang terbaca host. Di sini enkoder ada, tetapi \textbf{tertutup di dalam driver}:
+host hanya mengirim pulsa langkah dan arah, tidak pernah membaca $\bm{q}$, dan tidak dapat memerintahkan
+torsi sesaat. Karena itu \emph{Computed Torque Control} dan \emph{Sliding Mode Control} tetap tidak dapat
+diterapkan apa adanya, kini karena antarmukanya, bukan karena ketiadaan sensor. Penggantinya adalah umpan
+maju astronomis, pembentuk perintah \emph{input shaper} ZVD, dan tapis Kalman diperluas yang menaksir
+simpangan di \emph{sisi beban}, yaitu bagian yang justru tidak terlihat oleh enkoder rotor.
+
+Hasil utama: reduksi gigi mengubah anggaran torsi sumbu kemiringan dari $144\%$ (macet) menjadi $24\%$, dan
+memperhalus microstep di beban dari $0{,}1125\degg$ menjadi $0{,}0225\degg$. Karena reduksi menaikkan pegas
+magnet yang dirujuk ke beban melewati kekakuan poros, frekuensi alami kemiringan hanya bergeser $4{,}3\%$
+terhadap seluruh rentang penguatan driver yang belum diketahui, sehingga datasheet yang masih ditunggu
+praktis hanya memengaruhi azimuth. Tapis Kalman dengan LDR terkalibrasi menurunkan galat pointing dari
+$2{,}52\degg$ menjadi $0{,}18\degg$; beban angin terburuk sebelas tahun memakai $9{,}2\%$ torsi tahan.
+Panel diparkir datar saat hujan, dan itu terbukti tidak merugikan: pada mendung tebal panel datar justru
+memanen $102{,}3\%$ dari panel yang menjejak.
 \end{abstract}
 
 \tableofcontents
@@ -248,14 +257,20 @@ J_1(q_2) = I_{z1} + \left( m_2 r_c^2 + I_{y2} \right)\cos^2 q_2 + I_{z2}\sin^2 q
 \qquad
 J_2 = m_2 r_c^2 + I_{x2}.
 \end{equation}
-Bentuk ini dapat ditulis ulang sebagai $J_1(q_2) = a + b\cos^2 q_2$. Dari tensor inersia CAD dengan panel
-$2{,}55$~kg:
+Bentuk ini dapat ditulis ulang sebagai $J_1(q_2) = a + b\cos^2 q_2$. Dari tensor inersia mesh CAD desain
+baru, dengan panel $2{,}55$~kg menurut pelat nama:
 \begin{equation}
 J_1(q_2) = 0{,}1106 + 0{,}0408\cos^2 q_2 \ \mathrm{kg\,m^2}, \qquad
-J_2 = 0{,}0543 \ \mathrm{kg\,m^2}, \qquad
+J_2 = 0{,}0587 \ \mathrm{kg\,m^2}, \qquad
 \Delta I \equiv m_2 r_c^2 + I_{y2} - I_{z2} = 0{,}0408 \ \mathrm{kg\,m^2}.
 \end{equation}
-Nilai acuan: $J_1(0) = 0{,}1514$ dan $J_1(45\degg) = 0{,}1310 \ \mathrm{kg\,m^2}$.
+Nilai acuan: $J_1(0) = 0{,}1514$ dan $J_1(45\degg) = 0{,}1310 \ \mathrm{kg\,m^2}$. Massa yang berputar pada
+sumbu kemiringan naik menjadi $3{,}782$~kg (dulu $3{,}055$) karena rangka desain baru membawa rel, braket
+dan empat rakitan LDR; karena itu $J_2$ naik dari $0{,}0543$ ke $0{,}0587 \ \mathrm{kg\,m^2}$.
+
+\textbf{Catatan reduksi gigi.} Nilai di atas adalah inersia \emph{di sisi beban}. Inersia rotor yang
+dirujuk ke beban naik $N^2$, dan untuk sumbu kemiringan itu $1{,}1\times10^{-4} \times 25 = 2{,}75\times
+10^{-3} \ \mathrm{kg\,m^2}$, masih dua orde di bawah $J_2$, jadi tidak mengubah mode lambat.
 
 \subsection{Suku Coriolis dan sentripetal}
 
@@ -289,8 +304,9 @@ Tidak berpengaruh saat menjejak, tetapi mencapai $3{,}4\%$ saat slew cepat pada 
 
 \model{Momen gravitasi benda tegar tak seimbang}
 
-Massa berputar pada sumbu kemiringan $m_2 = 3{,}055$~kg (rangka elevasi $0{,}505$~kg ditambah panel
-$2{,}55$~kg), dengan pusat massa bergeser $c_y = 9{,}04$~mm dan $c_z = 49{,}93$~mm dari sumbu engsel:
+Massa berputar pada sumbu kemiringan $m_2 = 3{,}782$~kg, dengan pusat massa bergeser hanya
+$c_y = 0{,}23$~mm dan $c_z = 32{,}82$~mm dari sumbu engsel. \textbf{Desain baru jauh lebih seimbang}:
+komponen $c_y$, yang menentukan momen pada posisi datar, turun dari $9{,}04$~mm menjadi $0{,}23$~mm.
 \begin{equation}
 \bm{g}(\bm{q}) = \begin{bmatrix} 0 \\ -m_2 g \left( c_y \cos q_2 - c_z \sin q_2 \right) \end{bmatrix},
 \qquad g = 10 \ \mathrm{m/s^2} \ \text{(keputusan)}.
@@ -301,8 +317,8 @@ $2{,}55$~kg), dengan pusat massa bergeser $c_y = 9{,}04$~mm dan $c_z = 49{,}93$~
 \toprule
 \textbf{Posisi} & \textbf{Momen gravitasi} & \textbf{Defleksi statis} \\
 \midrule
-$q_2 = 0$ & $0{,}276$ N\,m & $0{,}155\degg$ (prediksi), $\bm{0{,}161\degg}$ \textbf{terukur Gazebo} \\
-$q_2 = -45\degg$ & $\bm{1{,}274}$ \textbf{N\,m} (maksimum) & $0{,}717\degg$ \\
+$q_2 = 0$ (parkir) & $\bm{0{,}0088}$ \textbf{N\,m} & $0{,}0031\degg$; terukur Gazebo di bawah $0{,}001\degg$ \\
+$q_2 = -45\degg$ & $\bm{0{,}884}$ \textbf{N\,m} (maksimum) & $0{,}315\degg$ \\
 \bottomrule
 \end{longtable}
 
@@ -350,8 +366,8 @@ dengan $\omega_n = \sqrt{K/J}$ dan $\zeta = b/(2\sqrt{KJ})$.
 \toprule
 \textbf{Sumbu} & \textbf{Nilai eigen} & $\mathrm{Re}(\lambda)$ & $f_n$ & $\zeta$ & $\tau_{\text{peluruhan}}$ \\
 \midrule
-Azimuth & $-0{,}661 \pm 30{,}09j$ & $-0{,}661$ & $\bm{4{,}79}$ \textbf{Hz} & $0{,}0219$ & $1{,}51$ s \\
-Kemiringan & $-1{,}842 \pm 43{,}26j$ & $-1{,}842$ & $\bm{6{,}89}$ \textbf{Hz} & $0{,}0425$ & $0{,}54$ s \\
+Azimuth & $-0{,}661 \pm 44{,}79j$ & $-0{,}661$ & $\bm{7{,}13}$ \textbf{Hz} & $0{,}0147$ & $1{,}51$ s \\
+Kemiringan & $-1{,}704 \pm 52{,}34j$ & $-1{,}704$ & $\bm{8{,}33}$ \textbf{Hz} & $0{,}0325$ & $0{,}59$ s \\
 \bottomrule
 \end{longtable}
 
@@ -362,13 +378,15 @@ titik setimbang setelah bergerak.} Itu pembuktian formal yang diminta.
 \begin{equation}
 M_p = \exp\!\left( \frac{-\pi\zeta}{\sqrt{1-\zeta^2}} \right)
 \;\Longrightarrow\;
-M_p^{\mathrm{az}} = 93{,}3\%, \qquad M_p^{\mathrm{el}} = 87{,}5\%.
+M_p^{\mathrm{az}} = 95{,}5\%, \qquad M_p^{\mathrm{el}} = 90{,}3\%.
 \end{equation}
-\textbf{Terukur di Gazebo: $90\%$ dan $82\%$} untuk langkah $1\degg$. Selisihnya berasal dari gesekan Coulomb
-yang tidak termasuk dalam model linier.
+\textbf{Belum divalidasi ulang untuk konfigurasi ini.} Angka Gazebo yang pernah diukur ($90\%$ dan $82\%$
+untuk langkah $1\degg$) berasal dari desain LAMA: penggerak langsung, $T_h = 3$~N\,m, loop terbuka. Dengan
+reduksi gigi, motor $1{,}5$~N\,m dan loop tertutup, uji langkah dan uji peredam ZVD \emph{belum dijalankan
+ulang}, sehingga tabel di atas adalah prediksi analitik tanpa jangkar pengukuran.
 
 %=====================================================================
-\section{Aktuator: Motor Stepper Loop Terbuka}
+\section{Aktuator: Stepper Loop Tertutup dengan Reduksi Gigi}
 \label{sec:step}
 
 Bagian ini tidak ada dalam kerangka rujukan, tetapi menentukan seluruh rancangan kontrol di sini.
@@ -377,23 +395,60 @@ Bagian ini tidak ada dalam kerangka rujukan, tetapi menentukan seluruh rancangan
 
 \model{Model torsi-sudut sinusoidal motor stepper hibrid}
 
-Motor digerakkan pulsa posisi, bukan perintah torsi. Torsi pemulih bergantung selisih sudut listrik:
+Motor digerakkan pulsa posisi, bukan perintah torsi. Torsi pemulih bergantung selisih sudut listrik,
+dan pada driver loop tertutup pegas magnet diperkuat penguatan posisi driver $K_p$:
 \begin{equation}
-\tau = T_h \sin\!\Big( N_r \big( \theta_{\mathrm{cmd}} - \theta_{\mathrm{beban}} - \tau/k \big) \Big),
-\qquad T_h = 3 \ \mathrm{N\,m}, \quad N_r = 50,
+\tau = \mathrm{Sat}\!\Big( T_h \sin( N_r e ) + K_p e, \ \pm T_h \Big),
+\qquad e = \theta_{\mathrm{cmd}} - \theta_{\mathrm{rotor}},
+\qquad T_h = 1{,}5 \ \mathrm{N\,m}, \quad N_r = 50,
 \label{eq:stepper}
 \end{equation}
-dengan $k$ kekakuan puntir poros. Persamaan ini implisit terhadap $\tau$ dan diselesaikan secara numerik;
-penyelesaiannya tunggal selama $k > T_h N_r$.
+dengan $K_p = 0$ mengembalikan hukum loop terbuka yang lama persis.
+
+\textbf{Batas fisis yang menentukan $K_p$.} Torsi driver tetap dibatasi $T_h$, jadi kekakuan kecil-sinyal
+hanya terwujud selama $|e| < T_h/(T_h N_r + K_p)$. Pada $K_p = 300$ jangkauan linier itu $0{,}229\degg$,
+sekitar dua microstep. Limit ``rotor terpaku'' ($K_p \to \infty$) \textbf{tidak fisis}: jangkauan liniernya
+nol, sehingga kekakuan yang dijanjikannya tidak pernah terwujud pada amplitudo mana pun.
+
+\subsection{Reduksi gigi}
+
+\model{Rantai roda gigi lurus satu tingkat}
+
+Sumbu kemiringan memakai satu tingkat reduksi; azimuth tetap penggerak langsung.
+\begin{equation}
+N = \frac{z_2}{z_1} = \frac{30}{6} = 5{,}0, \qquad m = 2{,}75 \ \mathrm{mm},
+\qquad d_1 = 16{,}5, \quad d_2 = 82{,}5 \ \mathrm{mm}.
+\end{equation}
+Rasio ini \textbf{diukur langsung di alat} (lima putaran pinion untuk satu putaran gigi besar), dan
+diameter luar terukur $22$ dan $88$~mm cocok dengan $OD = m(z+2)$ pada modul $2{,}75$. Jarak sumbu
+$49{,}5$~mm berbanding $50{,}2$~mm pada CAD.
+
+Reduksi melipatkan torsi $N$ kali dan membagi langkah $N$ kali:
+\begin{equation}
+T_{h,L} = N T_h = 7{,}5 \ \mathrm{N\,m}, \qquad
+\Delta_{\mu,L} = \frac{\Delta_\mu}{N} = 0{,}0225\degg .
+\end{equation}
 
 \subsection{Kekakuan seri}
 
-\model{Pegas seri (motor dan poros)}
+\model{Pegas seri (pegas magnet dirujuk ke beban, seri dengan poros)}
+
+Pegas magnet yang dirujuk ke sisi beban naik $N^2$; poros sudah berada di sisi beban sehingga tidak
+diskalakan:
 \begin{equation}
-K = \left( \frac{1}{T_h N_r} + \frac{1}{k} \right)^{-1}
+K = \left( \frac{1}{(T_h N_r + K_p) N^2} + \frac{1}{k} \right)^{-1}
 \;\Longrightarrow\;
-K_{\mathrm{az}} = 137{,}14, \qquad K_{\mathrm{el}} = 101{,}82 \ \mathrm{N\,m/rad}.
+K_{\mathrm{az}} = 303{,}80, \qquad K_{\mathrm{el}} = 160{,}99 \ \mathrm{N\,m/rad},
 \end{equation}
+dengan $k_{\mathrm{az}} = 1600$ dan $k_{\mathrm{el}} = 163{,}8$~N\,m/rad. Nilai poros kemiringan itu
+dihitung dari panjang \textbf{terukur} di CAD, $194$~mm untuk poros baja $8$~mm, lewat $k = GJ/L$.
+
+\textbf{Akibat yang tidak intuitif dan penting untuk tesis ini.} Pada sumbu bergigi, $(T_h N_r + K_p)N^2
+= 1875$~N\,m/rad jauh melewati poros $163{,}8$, sehingga \textbf{poros yang menentukan} dan penguatan
+driver nyaris tidak berpengaruh. Frekuensi alami kemiringan hanya bergerak dari $8{,}06$ ke $8{,}41$~Hz
+untuk $K_p$ dari nol sampai tak hingga, yaitu sebaran $4{,}3\%$. Pada azimuth yang penggerak langsung,
+rentang yang sama memberi $3{,}46$ sampai $16{,}36$~Hz, sebaran $373\%$. Jadi datasheet driver yang masih
+ditunggu praktis hanya memengaruhi azimuth.
 
 \subsection{Kuantisasi microstep dan kejenuhan}
 
@@ -404,17 +459,34 @@ K_{\mathrm{az}} = 137{,}14, \qquad K_{\mathrm{el}} = 101{,}82 \ \mathrm{N\,m/rad
 \end{equation}
 Tangga inilah \textbf{sumber eksitasi ayunan saat menjejak}, bukan gangguan luar.
 
-Bila torsi luar melewati $T_h$ motor kehilangan sinkron dan beban lari sejauh kelipatan siklus listrik
-$360\degg/N_r = 7{,}2\degg$. \textbf{Lepas langkah tidak pernah pulih sendiri} karena tidak ada enkoder.
+Pada sumbu bergigi, kuantisasi yang terlihat beban menjadi $\Delta_{\mu,L} = 0{,}0225\degg$, lima kali
+lebih halus.
+
+Bila torsi luar melewati $T_{h,L}$ motor kehilangan sinkron. \textbf{Berbeda dengan desain lama, kini
+driver mengoreksi sendiri} karena enkoder rotor melihat selisihnya; yang tersisa adalah \emph{alarm galat
+ikut} ketika selisih melewati ambang, bukan hanyutan permanen yang diam-diam menumpuk.
+
+\textbf{Batas model.} Hukum Persamaan~\eqref{eq:stepper} hanya bernilai tunggal bila $k > T_{h,L} N_{r,L}$.
+Dengan reduksi, ruas kanan menjadi $2067$~N\,m/rad melawan poros $163{,}8$, sehingga syarat itu
+\textbf{gagal} dan kurva torsi kuasi-statis menjadi bernilai ganda. Karena itu simulasi desain ini memakai
+model aktuator linier (kekakuan $K$ dengan kejenuhan $T_{h,L}$), bukan hukum sinus loop terbuka.
 
 %=====================================================================
 \section{Strategi Kontrol}
 
 Kerangka rujukan mengusulkan \emph{Computed Torque Control},
 $\bm{\tau} = \bm{M}(\ddot{\bm{q}}_d + K_v\dot{\bm{e}} + K_p\bm{e}) + \bm{C}\dot{\bm{q}} + \bm{g} + \bm{F}$,
-dan \emph{Sliding Mode Control} dengan permukaan $S = \dot{\bm{e}} + \Lambda\bm{e}$. \textbf{Keduanya
-menuntut $\bm{q}$ dan $\dot{\bm{q}}$ terukur tiap siklus serta kemampuan mengatur torsi sesaat; alat ini
-tidak memiliki keduanya.} Penggantinya tiga lapis berikut.
+dan \emph{Sliding Mode Control} dengan permukaan $S = \dot{\bm{e}} + \Lambda\bm{e}$. Keduanya menuntut
+$\bm{q}$ dan $\dot{\bm{q}}$ terukur tiap siklus serta kemampuan mengatur torsi sesaat.
+
+\textbf{Alat ini kini punya enkoder, tetapi tetap tidak memenuhi syarat itu, dan alasannya bergeser.}
+Enkoder berada \emph{di dalam} driver loop tertutup: host mengirim pulsa langkah dan arah, tidak pernah
+membaca $\bm{q}$, dan tidak dapat memerintahkan torsi sesaat. Lebih jauh, enkoder mengukur \emph{rotor},
+bukan beban, sehingga berada di sisi yang salah dari kelenturan poros dan reduksi gigi. Jadi premis
+``tidak ada pengukuran'' kini hanya separuh benar, sedangkan premis ``tidak ada antarmuka torsi'' tetap
+berlaku penuh, dan premis kedua itu saja sudah cukup untuk menyingkirkan CTC maupun SMC.
+
+Penggantinya tiga lapis berikut.
 
 \subsection{Umpan maju astronomis}
 
@@ -705,6 +777,74 @@ Pengali $3$ & $18{,}66$ m/s & $83{,}1\%$ \\
 (\emph{tenang}, \emph{berangin}, \emph{badai}) karena itu dibuang dan diganti pengali terhadap data nyata.
 
 %=====================================================================
+\section{Hujan: Parkir Datar, Kaca Basah, dan Pendinginan}
+
+\model{Reanalisis presipitasi Open-Meteo (ERA5)}
+
+Sumber sama dengan angin: $102{,}984$ jam per jam untuk titik PENS, 2015 sampai 2026, kolom presipitasi,
+hujan dan kelembapan. Curah $1792$~mm per tahun, dan pola monsun jelas: $43{,}7\%$ jam siang basah pada
+Februari berbanding $2{,}2\%$ pada Agustus. Ambang kebijakan $0{,}2$~mm/jam dengan tahan $1$~jam setelah
+hujan berhenti (ASUMSI, menunggu sensor hujan di alat).
+
+\subsection{Mengapa parkir datar tidak merugikan}
+
+Secara optik hujan adalah mendung tebal. Pada okta 8 komponen langsung runtuh ke sekitar $4$~W/m$^2$,
+sehingga hampir seluruh cahaya menjadi baur. Panel datar melihat \emph{seluruh} kubah langit, panel miring
+melihat lebih sedikit. Energi sehari pada bidang panel (7 Okt 2026, kWh/m$^2$):
+
+\begin{longtable}{c r r r}
+\toprule
+\textbf{okta} & \textbf{menjejak} & \textbf{datar} & \textbf{datar/menjejak} \\
+\midrule
+$0$ (cerah) & $7{,}70$ & $7{,}25$ & $94{,}1\%$ \\
+$4$ & $7{,}09$ & $6{,}73$ & $94{,}9\%$ \\
+$6$ & $5{,}29$ & $5{,}20$ & $98{,}3\%$ \\
+$\bm{8}$ \textbf{(hujan)} & $1{,}77$ & $1{,}81$ & $\bm{102{,}3\%}$ \\
+\bottomrule
+\end{longtable}
+
+Jadi parkir datar saat hujan justru menang tipis, di samping membuat air mengalir keluar dan mengurangi
+luas hadap terhadap angin. Hanya kemiringan yang diratakan; azimuth dibiarkan di tempat karena datar
+berarti $q_2 = 0$ berapa pun azimuthnya.
+
+\subsection{Kaca basah: lapisan air menolong, tetesan merugikan}
+
+\model{Pantulan Fresnel pada antarmuka berlapis}
+
+Ini sering disalahpahami. Lapisan air rata \textbf{mengurangi} pantulan, karena indeks bias air berada di
+antara udara dan kaca sehingga bekerja sebagai lapisan pencocok indeks:
+\begin{equation}
+R(n_1,n_2) = \left(\frac{n_1-n_2}{n_1+n_2}\right)^2, \qquad
+n_{\mathrm{udara}} = 1{,}0, \quad n_{\mathrm{air}} = 1{,}333, \quad n_{\mathrm{kaca}} = 1{,}52 .
+\end{equation}
+Pada datang tegak: kering memantulkan $4{,}26\%$, basah $2{,}46\%$, sehingga transmisi \emph{naik}
+$1{,}88\%$. Suku ini diturunkan, bukan ditebak.
+
+Yang merugikan adalah \textbf{tetesan} yang menghamburkan dan membayangi, dan itulah satu-satunya suku
+empiris, $5\%$ (ASUMSI; pustaka $2$ sampai $8\%$). Faktor transmisi basah bersih:
+\begin{equation}
+T_{\mathrm{basah}} = \frac{(1-R_{\mathrm{ua}})(1-R_{\mathrm{ak}})}{1-R_{\mathrm{uk}}}\,(1-\epsilon_{\mathrm{tetes}})
+= 0{,}9679 .
+\end{equation}
+
+\subsection{Pendinginan, dan jebakan hitung ganda}
+
+Model NOCT \textbf{sudah} menurunkan suhu sel saat hujan semata karena irradiance jatuh: pada udara
+$30\degg$C, POA $1000$ memberi $61{,}2\degg$C sedangkan POA $250$ memberi $37{,}8\degg$C. Pendinginan
+\emph{tambahan} oleh air hanya sisa $37{,}8 \to 30\degg$C, yaitu sekitar $3{,}9\%$ daya pada
+$-0{,}497\%/\degg$C. Mengutip belasan persen untuk pendinginan hujan berarti menghitung ganda efek
+irradiance yang sudah masuk lewat okta.
+
+\textbf{Hasil bersih pada irradiance sama} (okta 8): transmisi $0{,}9679$ dan suhu sel $37{,}8 \to
+30{,}0\degg$C memberi $P_{mp}$ $11{,}265 \to 11{,}379$~W, yaitu $+1{,}01\%$. Panel basah menghasilkan
+sedikit \emph{lebih} daripada panel kering pada irradiance sama. Hujan merugikan lewat runtuhnya
+irradiance, bukan lewat basahnya.
+
+\textbf{Tervalidasi di Gazebo} pada 18 Februari 2026 (hari siang terbasah tahun itu, $18{,}1$~mm), okta 8:
+saat penanda hujan aktif, transmisi terbaca $0{,}9679$, suhu sel $30{,}0\degg$C, dan kemiringan parkir di
+$0{,}00\degg$; saat kering, transmisi $1{,}0$, suhu sel $33$ sampai $36{,}5\degg$C, dan panel menjejak.
+
+%=====================================================================
 \section{Osilasi dan Dampaknya pada Energi}
 
 Ayunan diukur pada laju penuh $1000$~Hz, dengan gerak jejak lambat dibuang lewat penapis lolos tinggi
@@ -739,13 +879,16 @@ harian lompatan besar lima kali sehari hanya $0{,}19$~mWh dari panen $431$~Wh. P
 tetapi alasannya beban mekanik, risiko lepas sinkron, dan derau ke sensor, bukan panen energi.
 
 %=====================================================================
-\section{Tapis Kalman Diperluas sebagai Pengganti Enkoder}
+\section{Tapis Kalman Diperluas sebagai Penaksir Sisi Beban}
 \label{sec:ekf}
 
 \subsection{Keadaan yang ditaksir}
 
 Kerangka rujukan mengusulkan UKF menaksir parameter fisis
-$\bm{\theta} = [m_2, r_c, b_1, b_2, C_{m,A}, C_{m,E}]$. Karena tidak ada enkoder, yang lebih mendesak adalah
+$\bm{\theta} = [m_2, r_c, b_1, b_2, C_{m,A}, C_{m,E}]$. Enkoder driver sudah menutup loop di sisi rotor,
+sehingga lepas langkah terkumpul bukan lagi masalah. Yang tersisa, dan justru tidak terlihat enkoder,
+adalah segala sesuatu di \emph{seberang} gigi dan poros: puntiran poros, backlash gigi, salah pasang
+mekanik, dan bias LDR. Karena itu yang ditaksir adalah
 \emph{simpangan} antara perintah dan beban:
 \begin{equation}
 \bm{b} = \begin{bmatrix} b_{\mathrm{az}} \\ b_{\mathrm{el}} \end{bmatrix}
@@ -879,7 +1022,7 @@ Kejenuhan $\mathrm{Sat}(\cdot)$ & batas torsi $3$ N\,m & berjalan \\
 Algoritma orbit astronomis & pvlib SPA & tervalidasi $0{,}011\degg$ \\
 Pengendali diskret & node ROS 2, 100 Hz & berjalan \\
 Penaksir keadaan (EKF) & \texttt{ekf\_node} & berjalan \\
-Enkoder kuadratur & \textbf{tidak ada} & diganti EKF + LDR \\
+Enkoder kuadratur & \textbf{ada, di rotor}, tertutup di dalam driver & tidak terbaca host; sisi beban tetap ditaksir EKF \\
 Latensi jaringan, jitter & \textbf{belum dimodelkan} & kekurangan \\
 Serangan FDI, NTP poisoning & \textbf{belum dimodelkan} & kekurangan \\
 Event-triggered control & \textbf{belum ada} & kekurangan \\

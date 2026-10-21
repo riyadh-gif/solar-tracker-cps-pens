@@ -224,7 +224,8 @@ def main():
 </robot>
 """
     (OUT / "solar_tracker_v2.urdf").write_text(urdf, encoding="utf-8")
-    info["gear"] = dict(rasio=GEAR_N, z1=8, z2=42, modul_mm=2.0, pada="elevation_joint")
+    info["gear"] = dict(rasio=GEAR_N, z1=6, z2=30, modul_mm=2.75, pada="elevation_joint",
+                       sumber="diukur pengguna: 5 putaran pinion = 1 putaran gigi besar; OD 22 dan 88 mm")
     info["joint"] = dict(azimuth=dict(sumbu=[0, 0, -1], z=z_az, batas_deg=math.degrees(AZ_LIMIT)),
                          elevasi=dict(sumbu=[1, 0, 0], z=z_el, batas_deg=math.degrees(EL_LIMIT)))
     (OUT / "inersia_v2.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
