@@ -34,6 +34,9 @@ Thumbs.db
 # berkas kerja sementara
 .fase*.py
 .n*.py
+.az*.py
+.rng*.py
+.m*.py
 .fx*.py
 .fix.py
 
