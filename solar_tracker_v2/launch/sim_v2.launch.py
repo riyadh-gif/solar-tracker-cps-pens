@@ -68,7 +68,8 @@ def setup(context):
                                         "-p", f"okta:={c['okta']}", "-p", f"loop:={c['loop']}",
                                         "-p", f"pakai_ekf:={c['pakai_ekf']}"], output="screen"))
         acts.append(ExecuteProcess(cmd=[PY, str(ROOT / "sensor_node.py"), "--ros-args", "-p", "use_sim_time:=true",
-                                        "-p", f"mism:={c['mism']}", "-p", f"kalibrasi:={c['kalibrasi']}"], output="screen"))
+                                        "-p", f"mism:={c['mism']}", "-p", f"kalibrasi:={c['kalibrasi']}",
+                                        "-p", f"tanggal:={c['date']}"], output="screen"))   # tanggal sama dengan node matahari, supaya deteksi hujan sejalan
         if c["ekf"].lower() == "true":
             acts.append(ExecuteProcess(cmd=[PY, str(ROOT / "ekf_node.py"), "--ros-args", "-p", "use_sim_time:=true"], output="screen"))
     if c["rviz"].lower() == "true":

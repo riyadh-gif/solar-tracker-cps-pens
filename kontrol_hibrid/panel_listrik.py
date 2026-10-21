@@ -43,6 +43,13 @@ NS = 36                       # sel seri
 ALPHA_SC = 0.0005 * ISC       # A/C  (+0.05 %/C)
 BETA_VOC = -0.0030 * VOC      # V/C  (-0.30 %/C)
 NOCT = 45.0                   # C
+
+# --- kaca basah dan pendinginan saat hujan ---
+N_UDARA, N_AIR, N_KACA = 1.0, 1.333, 1.52   # indeks bias, nilai buku
+RUGI_TETES = 0.05            # ASUMSI: rugi hamburan oleh TETESAN, pustaka umum 0.02 sampai 0.08.
+                             # Ini satu-satunya suku basah yang ditebak; sisanya diturunkan.
+F_SISA_PANAS = 0.0           # ASUMSI: bagian kenaikan suhu di atas udara yang TERSISA saat hujan aktif.
+                             # 0 berarti air mengalir membuang seluruh kenaikan, jadi sel = suhu udara.
 B0_IAM = 0.05                 # ASHRAE
 
 N_IDEAL = 1.1                 # faktor ideal dioda; TIDAK dapat ditentukan dari pelat nama (4 persamaan, 5 anu).
@@ -90,9 +97,35 @@ def listrik(poa, tcell=25.0):
     return {k: float(v) if np.isscalar(poa) or np.ndim(poa) == 0 else np.asarray(v) for k, v in r.items()}
 
 
-def suhu_sel(poa, tamb=30.0, noct=NOCT):
-    """Suhu sel (C) model NOCT. tamb bawaan 30 C (Surabaya siang, ASUMSI)."""
-    return tamb + (noct - 20.0) / 800.0 * poa
+def transmisi_basah(rugi_tetes=RUGI_TETES):
+    """Transmisi kaca BASAH relatif terhadap kaca kering (1.0 = sama).
+
+    Dua suku yang arahnya BERLAWANAN, dan ini sering disalahpahami:
+
+    1. Lapisan air rata justru MENGURANGI pantulan, karena indeks bias air (1.333) berada di antara
+       udara (1.0) dan kaca (1.52), jadi air bekerja sebagai lapisan pencocok indeks. Fresnel pada
+       datang tegak: kering memantulkan 4.26 %, basah 2.46 %, sehingga transmisi NAIK 1.88 %.
+       Suku ini DITURUNKAN, bukan ditebak.
+    2. TETESAN menghamburkan dan membayangi. Suku inilah yang merugikan, dan nilainya empiris.
+
+    Jadi kaca basah tidak otomatis rugi; yang rugi adalah tetesannya."""
+    R = lambda a, b: ((a - b) / (a + b)) ** 2
+    t_kering = 1.0 - R(N_UDARA, N_KACA)
+    t_basah = (1.0 - R(N_UDARA, N_AIR)) * (1.0 - R(N_AIR, N_KACA))
+    return (t_basah / t_kering) * (1.0 - rugi_tetes)
+
+
+def suhu_sel(poa, tamb=30.0, noct=NOCT, basah=False, f_sisa=F_SISA_PANAS):
+    """Suhu sel (C) model NOCT. tamb bawaan 30 C (Surabaya siang, ASUMSI).
+
+    basah=True: air hujan membuang sebagian kenaikan suhu di atas udara. PERHATIAN, ini mudah
+    dihitung ganda: model NOCT SUDAH menurunkan suhu sel saat hujan karena irradiance-nya turun
+    (POA 1000 -> 61.2 C, POA 250 -> 37.8 C pada udara 30 C). Pendinginan tambahan oleh air hanya
+    sisa 37.8 -> 30 C, yaitu sekitar 3.9 % daya pada -0.497 %/C, BUKAN belasan persen."""
+    tc = tamb + (noct - 20.0) / 800.0 * poa
+    if basah:
+        tc = tamb + f_sisa * (tc - tamb)
+    return tc
 
 
 def iam(aoi_deg):
@@ -100,7 +133,7 @@ def iam(aoi_deg):
     return np.nan_to_num(pvlib.iam.ashrae(np.asarray(aoi_deg, float), b=B0_IAM), nan=0.0)
 
 
-def poa_efektif(q1, q2, az, el, dni, dhi, ghi, albedo=0.25):
+def poa_efektif(q1, q2, az, el, dni, dhi, ghi, albedo=0.25, basah=False):
     """Irradiance efektif di bidang panel (W/m2) dari sudut sendi, dengan IAM pada komponen langsung.
     Model isotropik, sama dengan sun.poa dan solar_tracker/control_web.py."""
     n = tracker.fk(q1, q2)
@@ -110,7 +143,7 @@ def poa_efektif(q1, q2, az, el, dni, dhi, ghi, albedo=0.25):
     aoi = math.degrees(math.acos(min(1.0, cos_aoi)))
     langsung = dni * cos_aoi * float(iam(aoi))
     baur = dhi * (1 + ct) / 2 + ghi * albedo * (1 - ct) / 2    # IAM baur diabaikan (sudut datang efektifnya lebar)
-    return langsung + baur
+    return (langsung + baur) * (transmisi_basah() if basah else 1.0)
 
 
 def arus(q1, q2, az, el, dni, dhi, ghi, tamb=30.0, mode="mpp"):

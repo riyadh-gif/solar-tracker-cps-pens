@@ -34,9 +34,12 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "kontrol_hibrid"))
 import hybrid_sim as H       # noqa: E402
 import panel_listrik as PL   # noqa: E402
+sys.path.insert(0, str(ROOT / "cuaca"))
+import hujan as HJ   # noqa: E402  (hujan NYATA untuk menandai kaca basah)
 import tracker               # noqa: E402
 
-DEFAULTS = dict(enabled=True, mism=0.03, kalibrasi=False, tamb=30.0, albedo=0.25, seed=0)
+DEFAULTS = dict(enabled=True, mism=0.03, kalibrasi=False, tamb=30.0, albedo=0.25, seed=0,
+                tanggal="2026-10-04", hujan_auto=True)
 HZ = 5.0
 
 
@@ -84,9 +87,10 @@ def galat_pointing(q1_deg, q2_deg, az, el):
     return math.degrees(math.acos(max(-1.0, min(1.0, float(n @ tracker.sun_vec(az, el))))))
 
 
-def listrik(q1_deg, q2_deg, az, el, dni, dhi, ghi, tamb, albedo):
-    poa = PL.poa_efektif(math.radians(q1_deg), math.radians(q2_deg), az, el, dni, dhi, ghi, albedo)
-    tc = PL.suhu_sel(poa, tamb)
+def listrik(q1_deg, q2_deg, az, el, dni, dhi, ghi, tamb, albedo, basah=False):
+    """basah=True: kaca tertutup air (tetesan dan lapisan) dan sel didinginkan air hujan."""
+    poa = PL.poa_efektif(math.radians(q1_deg), math.radians(q2_deg), az, el, dni, dhi, ghi, albedo, basah)
+    tc = PL.suhu_sel(poa, tamb, basah=basah)
     r = PL.listrik(poa, tc)
     return poa, tc, r
 
@@ -124,10 +128,10 @@ def selftest():
 
 
 def diag_dict(jam, az, el, dni, dhi, ghi, c1, c2, b1, b2, p, rng, mism, tamb, albedo, wh, wh_flat, wh_ideal,
-              osil=None):
+              osil=None, basah=False):
     """Susun seluruh diagnostik jadi satu dict JSON."""
     v, ex, ey = ldr_baca(b1, b2, az, el, dni, dhi, p, rng, mism)
-    poa, tc, r = listrik(b1, b2, az, el, dni, dhi, ghi, tamb, albedo)
+    poa, tc, r = listrik(b1, b2, az, el, dni, dhi, ghi, tamb, albedo, basah)
     g_cmd, g_load = galat_pointing(c1, c2, az, el), galat_pointing(b1, b2, az, el)
     return dict(
         jam=round(jam, 4),
@@ -141,7 +145,8 @@ def diag_dict(jam, az, el, dni, dhi, ghi, c1, c2, b1, b2, p, rng, mism, tamb, al
                  mism=[round(x, 4) for x in mism]),
         listrik=dict(poa=round(poa, 1), tcell=round(tc, 2), isc=round(float(r["i_sc"]), 4),
                      imp=round(float(r["i_mp"]), 4), vmp=round(float(r["v_mp"]), 3),
-                     pmp=round(float(r["p_mp"]), 3), voc=round(float(r["v_oc"]), 3)),
+                     pmp=round(float(r["p_mp"]), 3), voc=round(float(r["v_oc"]), 3),
+                     basah=bool(basah), t_basah=round(PL.transmisi_basah(), 4) if basah else 1.0),
         energi=dict(wh=round(wh, 3), wh_datar=round(wh_flat, 3), wh_ideal=round(wh_ideal, 3),
                     gain_pct=round((wh / wh_flat - 1) * 100, 2) if wh_flat > 1e-6 else 0.0),
         osilasi=osil or dict(az=dict(pp=0.0, rms=0.0, f=0.0), el=dict(pp=0.0, rms=0.0, f=0.0), hz=0.0, n=0))
@@ -201,6 +206,13 @@ def main():
             jam, az, el, ghi, dni, dhi, c1, c2 = s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]
             tamb, alb = float(self.p_("tamb")), float(self.p_("albedo"))
             b1, b2 = self.load
+            # kaca BASAH bila hujan nyata sedang turun pada jam simulasi ini
+            basah = False
+            if bool(self.p_("hujan_auto")):
+                try:
+                    basah = HJ.parkir(str(self.p_("tanggal")), jam)
+                except Exception:
+                    basah = False
             # energi: integrasi terhadap JAM SIMULASI, hanya saat waktu maju (sama dengan control_web)
             if self.jam_lalu is not None and 0 < jam - self.jam_lalu < 0.25:
                 dh = jam - self.jam_lalu
@@ -208,8 +220,10 @@ def main():
                 cz = math.sin(math.radians(el))
                 poa_f = dni * max(0.0, cz) + dhi
                 poa_i = dni + dhi * (1 + cz) / 2 + ghi * alb * (1 - cz) / 2
+                if basah:
+                    poa_b, poa_f, poa_i = (x * PL.transmisi_basah() for x in (poa_b, poa_f, poa_i))
                 for i, poa in enumerate((poa_b, poa_f, poa_i)):
-                    self.wh[i] += float(PL.listrik(poa, PL.suhu_sel(poa, tamb))["p_mp"]) * dh
+                    self.wh[i] += float(PL.listrik(poa, PL.suhu_sel(poa, tamb, basah=basah))["p_mp"]) * dh
             elif self.jam_lalu is not None and jam < self.jam_lalu - 0.5:
                 self.wh = [0.0, 0.0, 0.0]      # hari berganti
             self.jam_lalu = jam
@@ -222,7 +236,7 @@ def main():
                             el={k: round(v, 5) for k, v in oe.items() if k in ("pp", "rms", "f")},
                             hz=round(oa["hz"], 1), n=oa["n"])
             d = diag_dict(jam, az, el, dni, dhi, ghi, c1, c2, b1, b2, self.p, self.rng, self.mism,
-                          tamb, alb, self.wh[0], self.wh[1], self.wh[2], osil)
+                          tamb, alb, self.wh[0], self.wh[1], self.wh[2], osil, basah=basah)
             self.pub.publish(String(data=json.dumps(d)))
             m = Float64MultiArray()
             m.data = [float(x) for x in d["ldr"]["v"]] + [d["ldr"]["ex"], d["ldr"]["ey"]]
