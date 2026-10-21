@@ -34,3 +34,9 @@ Thumbs.db
 # berkas kerja sementara
 .fase*.py
 .fix.py
+
+# hasil ekstrak desain baru (bisa dibuat ulang dari .rar, 28 MB)
+desainbaru/extracted/
+
+# mesh tampilan desain baru: 27 MB, dibuat ulang dengan "python build_model_v2.py"
+solar_tracker_v2/meshes/
