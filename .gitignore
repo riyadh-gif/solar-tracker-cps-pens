@@ -45,3 +45,6 @@ desainbaru/extracted/
 
 # mesh tampilan desain baru: 27 MB, dibuat ulang dengan "python build_model_v2.py"
 solar_tracker_v2/meshes/
+
+# bekal untuk Raspberry Pi: dibuat ulang dengan "bash buat_bekal_raspi.sh"
+bekal_raspi.tar.gz
