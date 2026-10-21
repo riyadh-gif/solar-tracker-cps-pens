@@ -6,6 +6,9 @@ import math
 import sys
 import time
 
+from pathlib import Path as _P
+sys.path.insert(0, str(_P(__file__).resolve().parent.parent / "dinamika"))
+import dyn_model as D   # noqa: E402  (frekuensi prediksi, satu sumber)
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
@@ -57,8 +60,13 @@ def main():
     dur = (T[-1] - T[0]) if len(T) > 1 else 0.0
     print(f"[{name}] pesan diterima: {len(T)} dalam {dur:.1f} s simulasi ({len(T) / max(dur, 1e-9):.0f} Hz; harapan sekitar 1000 Hz bila tak ada yang hilang)")
     if t_cmd is not None:
-        analyse("azimuth", T, rec["A"], t_cmd, math.degrees(az), "4.79")
-        analyse("elevasi", T, rec["E"], t_cmd, math.degrees(el), "6.89")
+        # prediksi DITURUNKAN dari dyn_model, bukan dipatok: ikut berubah saat Th, k, Kp atau N diubah
+        fpred = {}
+        for nm, key in (("azimuth", "azimuth"), ("elevasi", "elevasi")):
+            ax = D.AXES[key]
+            fpred[nm] = f"{math.sqrt(ax.K_ser() / ax.JL) / (2 * math.pi):.2f}"
+        analyse("azimuth", T, rec["A"], t_cmd, math.degrees(az), fpred["azimuth"])
+        analyse("elevasi", T, rec["E"], t_cmd, math.degrees(el), fpred["elevasi"])
     node.destroy_node()
     rclpy.try_shutdown()
 

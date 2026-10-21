@@ -380,10 +380,19 @@ M_p = \exp\!\left( \frac{-\pi\zeta}{\sqrt{1-\zeta^2}} \right)
 \;\Longrightarrow\;
 M_p^{\mathrm{az}} = 95{,}5\%, \qquad M_p^{\mathrm{el}} = 90{,}3\%.
 \end{equation}
-\textbf{Belum divalidasi ulang untuk konfigurasi ini.} Angka Gazebo yang pernah diukur ($90\%$ dan $82\%$
-untuk langkah $1\degg$) berasal dari desain LAMA: penggerak langsung, $T_h = 3$~N\,m, loop terbuka. Dengan
-reduksi gigi, motor $1{,}5$~N\,m dan loop tertutup, uji langkah dan uji peredam ZVD \emph{belum dijalankan
-ulang}, sehingga tabel di atas adalah prediksi analitik tanpa jangkar pengukuran.
+\textbf{Terukur di Gazebo untuk konfigurasi ini: $85{,}61\%$} pada langkah azimuth $1\degg$, berbanding
+$84{,}65\%$ dari model dua massa. Selisih $1{,}1$ titik persen. Rumus analitik memberi $95{,}5\%$ karena
+mengabaikan gesekan Coulomb dan kejenuhan torsi; model dua massa memasukkan keduanya dan Gazebo
+mengonfirmasinya.
+
+\textbf{Mengapa hanya langkah $1\degg$ yang dipakai sebagai jangkar.} URDF membatasi kecepatan sendi di
+$1$~rad/s. Percepatan jenuh $a = T_{h,L}/J$ memberi kecepatan puncak $v = \sqrt{2a\theta}$, dan langkah
+azimuth $1\degg$ ($0{,}59$~rad/s) adalah satu-satunya kasus yang \emph{tidak} menyentuh batas itu. Pada
+langkah lebih besar Gazebo direm sedangkan model Python tidak punya batas itu, sehingga langkah mentah
+meleset makin jauh: az $5\degg$ ($1{,}31$~rad/s) meleset $17$ titik, az $90\degg$ ($5{,}58$~rad/s) meleset
+$37$ titik. Sumbu kemiringan terkena batas pada semua ukuran karena percepatan jenuhnya $127{,}8$~rad/s$^2$,
+tiga belas kali azimuth. Seluruh strategi \emph{berprofil} (trapesium, ZV, ZVD) tetap cocok dengan model
+dalam sekitar satu titik persen di semua kasus.
 
 %=====================================================================
 \section{Aktuator: Stepper Loop Tertutup dengan Reduksi Gigi}
