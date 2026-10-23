@@ -23,6 +23,7 @@ Pakai:
 """
 import json
 import math
+import random
 import sys
 import time
 from pathlib import Path
@@ -42,7 +43,12 @@ from std_msgs.msg import Float64, Float64MultiArray, String   # noqa: E402
 
 DEFAULTS = dict(enabled=True, tiruan=True, i2c_bus=1, hz=5.0,
                 ads_addr=0x48, ina_addr=0x40, shunt_ohm=0.01, arus_maks=4.0,
-                tamb=30.0, albedo=0.25, vcc=3.3)
+                tamb=30.0, albedo=0.25, vcc=3.3,
+                # Salah pasang mekanik (deg), HANYA mode tiruan. Inilah galat yang memang jadi
+                # tugas LDR dan EKF: enkoder di rotor tidak bisa melihatnya, karena ia terjadi
+                # SETELAH poros. Tanpa ini, mode tiruan selalu memberi cahaya rata, sehingga
+                # fungsi pemerataan LDR tidak pernah teruji.
+                salah_pasang_q1=0.0, salah_pasang_q2=0.0)
 
 # --- ADS1115 ---
 ADS_KONV, ADS_KONF = 0x00, 0x01
@@ -109,7 +115,12 @@ def main():
     pub_diag = n.create_publisher(String, "/tracker/diag", 10)
     pub_ldr = n.create_publisher(Float64MultiArray, "/ldr/state", 10)
 
-    st = dict(sun=None, cmd=[0.0, 0.0], wh=0.0, jam_lalu=None)
+    # SATU rng untuk seluruh masa hidup node. JANGAN membuat random.Random(seed) di dalam tick:
+    # seed yang sama tiap tick membekukan derau ADC menjadi OFFSET TETAP (terukur ex=+0.000926,
+    # ey=-0.000416, yaitu 5.8 dan 2.6 LSB). Offset tetap sebesar itu melanggar asumsi EKF bahwa
+    # derau berpurata nol dan tidak berkorelasi, sehingga EKF menaksir salah pasang hantu dan
+    # taksiran salah pasang yang sebenarnya ikut melenceng.
+    st = dict(sun=None, cmd=[0.0, 0.0], wh=0.0, jam_lalu=None, rng=random.Random(0))
     n.create_subscription(Float64MultiArray, "/sun/state",
                           lambda m: st.__setitem__("sun", list(m.data)), 10)
     for i, t in enumerate(("/solar_tracker/azimuth_cmd", "/solar_tracker/elevation_cmd")):
@@ -133,16 +144,17 @@ def main():
         s = st["sun"]
         jam, az, el, ghi, dni, dhi, c1, c2 = s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]
         vcc, tamb, alb = float(p("vcc")), float(p("tamb")), float(p("albedo"))
+        sp1, sp2 = float(p("salah_pasang_q1")), float(p("salah_pasang_q2"))
 
         if i2c is not None:
             v = [baca_ldr(i2c, int(p("ads_addr")), k) for k in range(4)]
             arus, tegangan = baca_panel(i2c, int(p("ina_addr")), float(p("shunt_ohm")))
         else:
             # TIRUAN: pakai model yang sama dengan simulasi, supaya rantai ROS bisa diuji di meja
-            import random
             import hybrid_sim as H
             P = H.P()
-            nrm, xp, yp = H.basis(c1, c2)
+            # Optik LDR melihat orientasi SEBENARNYA, bukan yang diperintahkan.
+            nrm, xp, yp = H.basis(c1 + sp1, c2 + sp2)
             sv = tracker.sun_vec(az, el)
             # H.read hanya memberi (ex, ey, V rata-rata), sedangkan di sini perlu KEEMPAT tegangan,
             # jadi perhitungannya disusun ulang dari H.shade dan H.volt yang sama persis.
@@ -151,7 +163,7 @@ def main():
             ey_a = math.atan2(H.dot(sv, yp), cth)
             beam, dif = dni * max(cth, 0.0), dhi * (1 + nrm[2]) / 2
             sh = (H.shade(-ex_a, P.r), H.shade(ex_a, P.r), H.shade(-ey_a, P.r), H.shade(ey_a, P.r))
-            rng = random.Random(0)   # H.volt memakai rng.gauss, jadi random.Random bukan numpy
+            rng = st["rng"]   # H.volt memakai rng.gauss, jadi random.Random bukan numpy
             v = [H.volt(beam * (1 - sh[i]) + dif, P, rng) for i in range(4)]
             poa_t = PL.poa_efektif(math.radians(c1), math.radians(c2), az, el, dni, dhi, ghi, alb)
             r_t = PL.listrik(poa_t, PL.suhu_sel(poa_t, tamb))
@@ -183,9 +195,19 @@ def main():
                           dni=round(dni, 1), dhi=round(dhi, 1), ghi=round(ghi, 1)),
             sendi=dict(cmd_q1=round(c1, 4), cmd_q2=round(c2, 4), beban_q1=round(b1, 4), beban_q2=round(b2, 4),
                        d_q1=0.0, d_q2=0.0),
+            # perintah: galat sudut PERINTAH terhadap matahari. Saat koreksi EKF aktif, angka ini
+            # justru membesar sebesar koreksinya, karena perintah memang digeser dengan sengaja.
+            # tiruan_sebenarnya: galat orientasi SEBENARNYA (perintah + salah pasang). Inilah yang
+            # mengukur mutu penjejakan, dan hanya ada di mode tiruan karena di alat nyata salah
+            # pasang tidak diketahui.
             galat=dict(perintah=round(g_cmd, 4), beban=round(g_cmd, 4), dinamik=0.0,
+                       tiruan_sebenarnya=round(galat(c1 + sp1, c2 + sp2), 4) if i2c is None else None,
                        terjangkau=bool(el > 0 and abs(c2) < 44.9)),
             ldr=dict(v=[round(x, 4) for x in v], ex=round(ex, 6), ey=round(ey, 6), mism=[1.0] * 4),
+            # Hanya terisi di mode tiruan: kebenaran dasar untuk menilai taksiran EKF.
+            # Di alat nyata nilai ini TIDAK diketahui, itu justru alasan EKF ada.
+            tiruan=dict(salah_pasang_q1=float(p("salah_pasang_q1")),
+                        salah_pasang_q2=float(p("salah_pasang_q2"))) if i2c is None else None,
             listrik=dict(poa=round(poa, 1), tcell=round(tc, 2),
                          i_ukur=round(arus, 4), v_ukur=round(tegangan, 3), p_ukur=round(daya, 3),
                          imp_model=round(float(r["i_mp"]), 4), vmp_model=round(float(r["v_mp"]), 3),
