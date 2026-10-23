@@ -1,0 +1,280 @@
+===============================================================================
+PETUNJUK PEMAKAIAN RASPBERRY PI 5 - SOLAR TRACKER CPS PENS
+===============================================================================
+Mesin   : proyekssf@192.168.100.68
+Sistem  : Raspberry Pi OS, Debian 13 trixie, Docker, citra ssf-ros:jazzy
+Kode    : /home/proyekssf/projekssf
+Repo    : https://github.com/riyadh-gif/solar-tracker-cps-pens
+Dibuat  : 2026-10-23
+
+Berkas ini adalah petunjuk operasional. Penjelasan hasil dan angka lengkap ada
+di raspi/fungsi_results.md.
+
+
+-------------------------------------------------------------------------------
+0. KENAPA PAKAI DOCKER
+-------------------------------------------------------------------------------
+Raspberry Pi OS di sini adalah Debian 13 trixie. Repo apt ROS untuk trixie HANYA
+berisi perkakas bangun (bloom, colcon, catkin), NOL paket distro ROS. Sudah
+diperiksa langsung: 78 paket, tidak satu pun ros-jazzy-*.
+
+Jadi "apt install ros-jazzy-..." TIDAK MUNGKIN di mesin ini. Menulis ulang kartu
+SD ke Ubuntu akan menghapus sistem yang sudah terpasang. Citra resmi
+ros:jazzy-ros-base punya arm64, jadi itu yang dipakai.
+
+Python di dalam kontainer 3.12, di host 3.13. Keduanya TIDAK berbagi venv.
+Pustaka Python dipasang di dalam citra, bukan dipinjam dari host.
+
+
+-------------------------------------------------------------------------------
+1. TIGA FUNGSI UTAMA
+-------------------------------------------------------------------------------
+  Fungsi 1  Penggerak 2 motor stepper loop tertutup (tilt dan azimuth)
+            node: solar_tracker_v2/motor_node.py
+
+  Fungsi 2  Pemerataan intensitas cahaya oleh 4 LDR, menjadi keputusan sudut
+            node: solar_tracker_v2/sensor_hw_node.py + ekf_node.py
+
+  Fungsi 3  Pembacaan tegangan dan arus panel
+            node: solar_tracker_v2/sensor_hw_node.py
+
+
+-------------------------------------------------------------------------------
+2. PERINTAH: UJI KETIGA FUNGSI SEKALIGUS
+-------------------------------------------------------------------------------
+  sudo docker run --rm --network host --ipc host -e JAM=12.0 \
+    -v /home/proyekssf/projekssf:/proyek ssf-ros:jazzy bash /proyek/raspi/uji3.sh
+
+PENTING: perintah ini DIAM DULU sekitar 25 sampai 40 detik. Itu normal.
+Urutannya:
+
+  langsung      : baris "== Jalankan node =="
+  20 detik      : sleep, menunggu node siap. TIDAK ADA KELUARAN. Jangan dibatalkan.
+  1 - 15 detik  : dengar.py menangkap pesan, ketiga blok hasil keluar
+  1 detik       : node dimatikan, muncul "== selesai rc=0 =="
+
+Jeda 20 detik itu perlu karena sun_command_node harus memuat pvlib dan menghitung
+lintasan matahari sehari penuh sebelum menerbitkan perintah pertama.
+
+Kalau setelah 60 detik masih kosong, baru itu tanda masalah. Lihat bagian 7.
+
+Variabel yang bisa diubah:
+  JAM=12.0   jam lokal dibekukan. 12.0 tengah hari (galat pointing kecil).
+             6.0 memaksa kemiringan ke batas 45 deg, berguna menguji penjepit.
+
+
+-------------------------------------------------------------------------------
+3. PERINTAH: UJI RANTAI LDR SAMPAI MOTOR (FUNGSI 2 SAMPAI UJUNG)
+-------------------------------------------------------------------------------
+Ini yang membuktikan LDR benar-benar MENENTUKAN sudut motor, bukan hanya
+menerbitkan angka lalu diabaikan.
+
+  sudo docker run --rm --network host --ipc host \
+    -e SP1=2.0 -e SP2=2.0 -e EKF=true -e JAM=12.0 -e DURASI=60 \
+    -v /home/proyekssf/projekssf:/proyek ssf-ros:jazzy bash /proyek/raspi/uji_loop.sh
+
+Jalankan juga dengan EKF=false sebagai pembanding. Itulah yang membuktikan
+penurunan galat benar-benar berasal dari LDR, bukan dari hal lain.
+
+Variabel:
+  SP1, SP2   salah pasang mekanik azimuth dan kemiringan, deg. HANYA mode tiruan.
+  EKF        true = koreksi LDR menggerakkan motor; false = tidak
+  JAM        jam lokal dibekukan
+  DURASI     lama pemantauan, detik
+
+Hasil yang sudah terukur (kebenaran dasar 2,0 deg di kedua sumbu, jam 12.00):
+
+  EKF=false  galat pointing SEBENARNYA 2,0417 deg, TETAP selama 60 detik
+  EKF=true   galat pointing SEBENARNYA turun ke 0,0258 deg (purata 5 terakhir)
+             taksiran EKF b_az=+2,0817 deg, b_q2=+2,0046 deg
+
+Turun 79 kali.
+
+
+-------------------------------------------------------------------------------
+4. MENJALANKAN KEEMPAT NODE SENDIRI
+-------------------------------------------------------------------------------
+Masuk shell kontainer:
+
+  cd /home/proyekssf/projekssf && sudo bash raspi/jalan.sh
+
+Lalu di dalamnya:
+
+  cd /proyek/solar_tracker_v2
+  python3 sun_command_node.py --ros-args -p date:=2026-10-07 -p speed:=1 \
+          -p hour:=12.0 -p gz_light:=false &
+  python3 motor_node.py      --ros-args -p tiruan:=true &
+  python3 sensor_hw_node.py  --ros-args -p tiruan:=true &
+  python3 ekf_node.py &
+  python3 /proyek/raspi/dengar.py
+
+Catatan: jalan.sh memakai -it, jadi hanya untuk shell interaktif. Untuk uji
+berparameter pakai docker run langsung seperti bagian 2 dan 3, karena jalan.sh
+TIDAK meneruskan -e.
+
+
+-------------------------------------------------------------------------------
+5. TOPIK ROS
+-------------------------------------------------------------------------------
+  /solar_tracker/azimuth_cmd     Float64, rad, sudut BEBAN, SUDAH dibentuk
+  /solar_tracker/elevation_cmd   Float64, rad, sudut BEBAN, SUDAH dibentuk
+  /motor/state                   String JSON, keadaan kedua sumbu dan langkah
+  /tracker/diag                  String JSON, LDR + listrik + matahari + galat
+  /ldr/state                     Float64MultiArray, [v0..v3, ex, ey]
+  /ekf/state                     String JSON, taksiran simpangan sisi beban
+  /ekf/koreksi                   Float64MultiArray, [b_az, b_q2] deg
+  /sun/state                     Float64MultiArray, bukan String
+  /hujan/state                   Float64MultiArray, [basah, mm, kode mode]
+
+JEBAKAN: /sun/state dan /hujan/state bertipe Float64MultiArray, BUKAN String.
+Berlangganan dengan tipe salah tidak pernah menerima apa pun dan tampak seperti
+node yang mati. Konteks matahari tetap terbaca lewat /tracker/diag.
+
+JEBAKAN: jangan pakai "ros2 topic echo --once --field data /tracker/diag".
+echo membungkus string JSON sebagai YAML, jadi tanda kutip dan baris lipatan
+merusak json.load. Pakai raspi/dengar.py yang berbasis rclpy.
+
+
+-------------------------------------------------------------------------------
+6. BERALIH KE PERANGKAT KERAS SUNGGUHAN
+-------------------------------------------------------------------------------
+Keadaan sekarang: bus I2C SUDAH aktif, /dev/i2c-1 ADA
+(dtparam=i2c_arm=on di /boot/firmware/config.txt, sudah reboot,
+cadangan di config.txt.bak-sebelum-i2c).
+
+Tetapi "i2cdetect -y 1" masih KOSONG di 0x48 dan 0x40, karena sensor belum
+dikabel. Jadi semua hasil di atas membuktikan RANTAI PERANGKAT LUNAK, bukan
+sensornya.
+
+Periksa alamat:
+  i2cdetect -y 1
+  harus muncul 48 (ADS1115, 4 LDR) dan 40 (INA226, arus dan tegangan panel)
+
+Setelah terpasang, hilangkan tiruan:=true
+
+  python3 sensor_hw_node.py --ros-args -p tiruan:=false
+  python3 motor_node.py     --ros-args -p tiruan:=false
+
+Kalau gagal membaca I2C, sensor_hw_node OTOMATIS kembali ke mode tiruan dan
+menulis alasannya di log. Ia tidak akan diam-diam memberi angka palsu, tetapi
+PERIKSA LOGNYA supaya tidak salah menganggap angka tiruan sebagai pengukuran.
+
+Sensor yang dipakai:
+  ADS1115  0x48, PGA +-4,096 V, single-shot 128 SPS, 4 kanal single-ended
+  INA226   0x40, shunt 0,01 ohm
+
+
+-------------------------------------------------------------------------------
+7. KALAU ADA MASALAH: LOG
+-------------------------------------------------------------------------------
+Log keempat node ditulis ke volume terpasang dan TETAP ADA setelah kontainer mati:
+
+  ls -l /home/proyekssf/projekssf/log_uji/
+  tail -30 /home/proyekssf/projekssf/log_uji/sun.log
+  tail -30 /home/proyekssf/projekssf/log_uji/mot.log
+  tail -30 /home/proyekssf/projekssf/log_uji/sen.log
+  tail -30 /home/proyekssf/projekssf/log_uji/ekf.log
+
+Log sengaja ditulis ke /proyek, BUKAN /tmp. Pada uji pertama log ditulis ke /tmp
+dan semuanya hilang bersama kontainer, sehingga kegagalannya tidak bisa
+didiagnosis sama sekali.
+
+Node yang tertinggal dari jalan sebelumnya adalah penyebab kekacauan yang paling
+sering dan paling membingungkan: dua sun_command_node yang hidup bersamaan akan
+menerbitkan perintah yang saling bertabrakan, dan gejalanya tampak seperti
+ketidakstabilan fisika. Periksa dan bersihkan:
+
+  pgrep -af "sun_command_node|motor_node|sensor_hw_node|ekf_node"
+  pkill -f sun_command_node; pkill -f motor_node
+  pkill -f sensor_hw_node;   pkill -f ekf_node
+
+JANGAN memakai pkill -f dengan pola yang cocok dengan baris perintah pkill itu
+sendiri, karena ia akan membunuh dirinya sendiri.
+
+
+-------------------------------------------------------------------------------
+8. PETA PIN DRIVER - MASIH ASUMSI
+-------------------------------------------------------------------------------
+Nilai di bawah ini BELUM dikonfirmasi dan hanya bawaan. Semuanya parameter ROS,
+jadi tinggal diganti tanpa menyunting kode.
+
+  Sumbu      PUL  DIR  ENA  ALM     (nomor BCM)
+  azimuth     17   27   22   23
+  kemiringan   5    6   13   19
+
+  ena_aktif_rendah = true   kebanyakan driver: ENA LOW = motor aktif
+
+Contoh mengganti:
+  python3 motor_node.py --ros-args -p az_pul:=18 -p az_dir:=23 -p tiruan:=false
+
+Pi 5 WAJIB memakai lgpio dan gpiochip4. RPi.GPIO TIDAK BEKERJA di Pi 5.
+
+
+-------------------------------------------------------------------------------
+9. YANG HARUS DIPAHAMI SEBELUM MENAFSIRKAN ANGKA
+-------------------------------------------------------------------------------
+a) LOOP TERTUTUP ADA DI DRIVER, BUKAN DI RASPI.
+   Enkoder di dalam driver dan TIDAK terbaca host. Yang bisa dibaca host hanyalah
+   pin ALARM, yang menyala saat driver menyerah mengejar galat. Karena itu
+   motor_node TIDAK menutup loop posisi, dan sudut beban TIDAK terukur:
+   sendi.beban_q1 dan beban_q2 diisi nilai PERINTAH, bukan hasil pengukuran,
+   sehingga galat.beban sama dengan galat.perintah dan d_q1, d_q2 nol.
+   Inilah justru alasan EKF ada.
+
+b) galat.perintah TIDAK BOLEH dipakai menilai mutu penjejakan saat koreksi EKF
+   aktif. Koreksi memang menggeser perintah DENGAN SENGAJA, jadi angka itu
+   membesar sebesar koreksinya (0,0 menjadi sekitar 2,03 deg). Yang mengukur mutu
+   penjejakan adalah galat.tiruan_sebenarnya.
+
+c) selisih_arus_pct SELALU 0,00 % di mode tiruan, dan itu TAUTOLOGI: arus
+   "terukur" diturunkan dari model yang sama dengan pembandingnya. Angka itu baru
+   bermakna setelah INA226 nyata terpasang.
+
+d) motor_node SENGAJA TIDAK punya profil trapesium. Pembentukan gerak (profil
+   trapesium lalu input shaper ZVD) dikerjakan sun_command_node SEBELUM
+   diterbitkan, sama seperti di Gazebo. Menambahkan profil kedua akan menapis
+   ulang perintah yang sudah dibentuk dan merusak peredaman ZVD yang sudah
+   divalidasi, yaitu yang menurunkan lewatan azimuth dari 85,61 % ke 2,16 %.
+   JANGAN menambahkannya kembali.
+
+e) Satu langkah motor berarti 0,0225 deg di kemiringan dan 0,1125 deg di azimuth
+   (44,44 dan 8,89 langkah per deg beban, karena reduksi gigi N=5 hanya di
+   kemiringan). Sisa perintah yang lebih kecil daripada satu langkah adalah
+   KUANTISASI, bukan galat pelacakan.
+
+f) Batas sumbu: azimuth +-185 deg, kemiringan +-45 deg. Dijepit di motor_node,
+   karena node itulah satu-satunya yang menyentuh motor. Pada operasi normal
+   terjepit=False. Kalau terjepit=True terus, berarti ada yang memerintah di luar
+   batas mekanik.
+
+
+-------------------------------------------------------------------------------
+10. YANG BELUM DIKERJAKAN
+-------------------------------------------------------------------------------
+  - Sensor belum dikabel, i2cdetect masih kosong
+  - Peta pin driver belum dikonfirmasi
+  - Kalibrasi LDR prosedur A belum dikerjakan. Tanpa itu, pada data terdahulu
+    LDR justru MEMPERBURUK EKF (5,63 lawan 2,52 deg)
+  - Backlash gigi belum dimodelkan, dan tak terlihat enkoder rotor karena ada
+    setelah poros
+  - Model optik LDR masih sekat datar, belum teropong dan lensa (+-17,5 deg)
+  - Pemicu hujan masih data historis Open-Meteo, belum sensor hujan nyata
+  - velocity="1" rad/s di URDF masih asumsi lama
+  - SANDI proyekssf BELUM DIGANTI. Sandi itu pernah tertulis ke berkas di Pi
+    akibat kesalahan skrip (pipa ke sudo -S), jadi sebaiknya diganti.
+
+
+-------------------------------------------------------------------------------
+11. ATURAN KEAMANAN SKRIP YANG HARUS DIPATUHI
+-------------------------------------------------------------------------------
+JANGAN PERNAH menyalurkan apa pun ke dalam sudo -S lewat pipa.
+
+  SALAH : curl -s URL | S tee /etc/apt/keyrings/docker.asc
+          S() { echo "$SANDI" | sudo -S ...; }
+          Sandi MENIMPA keluaran curl, dan SANDI ITU yang tertulis ke berkas
+          kunci. set -euo pipefail TIDAK menangkapnya, skrip keluar 0.
+
+  BENAR : unduh ke /tmp sebagai pengguna biasa, lalu "sudo install" berkas itu,
+          dan periksa isinya (misalnya cari "BEGIN PGP") sebelum dipakai.
+
+===============================================================================
